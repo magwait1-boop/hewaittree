@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 
 const pioneers = [
   {
@@ -59,7 +58,7 @@ export default function AboutUsPage() {
   return (
     <div dir="rtl" className="w-full min-h-screen bg-slate-950 text-slate-200 overflow-y-auto selection:bg-amber-600 selection:text-white">
       
-      {/* شريط علوي للتنقل والعودة */}
+      {/* شريط علوي للعودة والتنقل */}
       <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-amber-900/30 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-amber-500 text-xl font-bold">عائلة حويت</span>
@@ -73,7 +72,7 @@ export default function AboutUsPage() {
         </Link>
       </header>
 
-      {/* خلفية جمالية ممتدة */}
+      {/* المحتوى */}
       <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-600/10 blur-[130px] rounded-full pointer-events-none" />
 

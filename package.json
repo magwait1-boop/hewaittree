@@ -9,8 +9,7 @@
       "react-dom",
       "@dhiwise/component-tagger",
       "@tailwindcss/typography",
-      "recharts",
-      "framer-motion": "^11.0.0"
+      "recharts"
     ],
     "devDependencies": [
       "typescript",
