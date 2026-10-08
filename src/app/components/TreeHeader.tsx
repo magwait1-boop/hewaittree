@@ -23,7 +23,7 @@ export default function TreeHeader({
   onSearch, onNavigateSearch, onLoginClick, onLogout, onPrint
 }: Props) {
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const count = totalPersons ?? 2214;
+  const count = totalPersons ?? 0;
 
   return (
     <>
@@ -107,6 +107,9 @@ export default function TreeHeader({
 
         {/* User status */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          <Link href="/about" className="btn-base text-xs px-3 py-1.5 no-print inline-flex items-center gap-1">
+            ℹ️ <span>من نحن</span>
+          </Link>
           <button onClick={onPrint} className="btn-base text-xs px-3 py-1.5 no-print flex items-center gap-1">
             🖨️ <span>طباعه</span>
           </button>

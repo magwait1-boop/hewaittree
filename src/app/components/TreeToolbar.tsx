@@ -1,9 +1,10 @@
 'use client';
-import React, { useRef } from 'react';
+import React, { useMemo } from 'react';
 import type { CurrentUser } from './FamilyTreeClient';
 import type { Person } from '@/lib/familyData';
 
 interface Props {
+  persons: Person[];
   currentUser: CurrentUser | null;
   pendingCount: number;
   onAddPerson: () => void;
@@ -16,12 +17,18 @@ interface Props {
 }
 
 export default function TreeToolbar({
-  currentUser, pendingCount,
+  persons, currentUser, pendingCount,
   onAddPerson, onOpenAdmin,
   onOpenSettings, onPrint,
 }: Props) {
   const isEditor = currentUser?.role === 'admin' || currentUser?.role === 'supervisor';
   const isAdmin = currentUser?.role === 'admin';
+
+  const totalPersons = persons.length;
+  const totalBranches = useMemo(
+    () => new Set(persons.map(p => p.branch?.trim()).filter(Boolean)).size,
+    [persons]
+  );
 
   return (
     <div
@@ -77,11 +84,11 @@ export default function TreeToolbar({
         </button>
         <span className="stat-pill">
           <span className="w-2 h-2 rounded-full bg-primary inline-block" />
-          2,214 شخص
+          {totalPersons.toLocaleString('ar-EG')} شخص
         </span>
         <span className="stat-pill hidden md:inline-flex">
           <span className="w-2 h-2 rounded-full bg-warning inline-block" />
-          15 فرع
+          {totalBranches.toLocaleString('ar-EG')} فرع
         </span>
       </div>
     </div>);

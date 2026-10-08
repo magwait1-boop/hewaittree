@@ -692,6 +692,7 @@ export default function FamilyTreeClient() {
 
       {/* Toolbar */}
       <TreeToolbar
+        persons={persons}
         currentUser={currentUser}
         pendingCount={pendingRequests.length}
         onAddPerson={() => openAddPerson()}
