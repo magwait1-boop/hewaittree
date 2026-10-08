@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 
-// --- بيانات العائلة ---
 const pioneers = [
   {
     name: "الشيخ منصور أحمد حويت (رحمه الله)",
@@ -26,15 +26,15 @@ const modernTeam = [
   },
   {
     name: "المهندس مجدي السيد حويت",
-    desc: "المؤسس الحقيقي لهذا المشروع بشكله الرقمي. أخذ على عاتقه نقل شجرة العائلة من الورق إلى عالم التكنولوجيا، وقام بجمع وتنسيق قاعدة بيانات ضخمة، وتطوير تطبيق حديث."
+    desc: "المؤسس الحقيقي لهذا المشروع بشكله الرقمي. أخذ على عاتقه نقل شجرة العائلة من الورق إلى عالم التكنولوجيا، وقام بجمع وتنسيق قاعدة بيانات ضخمة، وتطوير تطبيق حديث. وبعد تجارب مستمرة، خرج الموقع بهذا الشكل التفاعلي المتميز."
   },
   {
     name: "المهندس عبداللطيف طه حويت",
-    desc: "صاحب الهمة العالية والمجهود الجبار في التواصل المباشر. أخذ على عاتقه الاتصال بمعظم أفراد العائلة فرداً فرداً للسؤال عن تفاصيل أجدادهم وأبنائهم، فكان له الفضل الأكبر في تجميع هذا الكم الهائل."
+    desc: "صاحب الهمة العالية والمجهود الجبار في التواصل المباشر. أخذ على عاتقه الاتصال بمعظم أفراد العائلة فرداً فرداً للسؤال عن تفاصيل أجدادهم وأبنائهم، فكان له الفضل الأكبر في تجميع هذا الكم الهائل، وخاصة فرع سيدي العفيفي."
   },
   {
     name: "الأستاذ سلامة حويت",
-    desc: "الأب الروحي والداعم الدائم لهذا المشروع. لم يبخل علينا بتوجيهاته، وكان دائم السؤال عن تفاصيل العمل وآخر المستجدات، يزرع فينا الأمل ويبث فينا العزيمة."
+    desc: "الأب الروحي والداعم الدائم لهذا المشروع. لم يبخل علينا بتوجيهاته، وكان دائم السؤال عن تفاصيل العمل وآخر المستجدات، يزرع فينا الأمل ويبث فينا العزيمة لإخراج هذا العمل بأفضل صورة."
   }
 ];
 
@@ -55,123 +55,122 @@ const specialThanks = [
   "الأستاذ محمد عبدالعظيم حويت"
 ];
 
-// --- إعدادات الحركات ---
-const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
-};
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.2 } }
-};
-
 export default function AboutUsPage() {
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-950 text-slate-300 font-sans selection:bg-amber-600 selection:text-white pb-20 relative overflow-hidden">
+    <div dir="rtl" className="w-full min-h-screen bg-slate-950 text-slate-200 overflow-y-auto selection:bg-amber-600 selection:text-white">
       
-      {/* خلفية زخرفية */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[500px] bg-amber-600/10 blur-[120px] rounded-full pointer-events-none" />
+      {/* شريط علوي للتنقل والعودة */}
+      <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-amber-900/30 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-amber-500 text-xl font-bold">عائلة حويت</span>
+          <span className="text-xs text-amber-500/70 border border-amber-500/30 px-2 py-0.5 rounded-full">وثيقة وفاء وتاريخ</span>
+        </div>
+        <Link 
+          href="/" 
+          className="inline-flex items-center gap-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+        >
+          <span>←</span> العودة إلى الشجرة
+        </Link>
+      </header>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 relative z-10">
-        
+      {/* خلفية جمالية ممتدة */}
+      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-600/10 blur-[130px] rounded-full pointer-events-none" />
+
         {/* رأس الصفحة */}
-        <motion.div initial="hidden" animate="visible" variants={fadeUp} className="text-center mb-16">
+        <section className="text-center mb-20 relative z-10">
           <div className="flex items-center justify-center gap-4 mb-4 text-amber-500">
             <span className="w-12 h-[1px] bg-amber-500/50"></span>
             <span className="text-2xl">۞</span>
             <span className="w-12 h-[1px] bg-amber-500/50"></span>
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600 leading-normal pb-2">
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600 pb-2">
             من نحن – جذور ممتدة وأغصان مثمرة
           </h1>
           <p className="text-lg md:text-xl leading-relaxed text-slate-300 max-w-3xl mx-auto font-light">
             أهلاً بكم في الموقع الرسمي لشجرة عائلة <span className="text-amber-400 font-bold">"حويت"</span>.
             نحن عائلة نعتز بجذورنا الأصيلة الممتدة لقبيلة الحويطات العريقة، وبأجدادنا الذين سطروا تاريخاً من العزة والمحبة والأصالة. هذا الموقع لم يُبنَ في يوم وليلة، بل هو ثمرة حب، وحلم توارثته الأجيال لربط الماضي بالحاضر، وتوثيق صلة الرحم لتكون شجرتنا مرجعاً ووثيقة فخر لكل ابن وحفيد.
           </p>
-        </motion.div>
+        </section>
 
-        {/* قسم الرواد */}
-        <motion.section initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer} className="mb-20">
-          <motion.h2 variants={fadeUp} className="text-3xl font-bold text-amber-500 mb-8 flex items-center gap-3">
-            <span className="text-xl">❖</span> رواد التوثيق الأوائل (جيل الرواد)
-          </motion.h2>
-          <motion.p variants={fadeUp} className="text-slate-400 mb-8 text-lg">
+        {/* قسم جيل الرواد */}
+        <section className="mb-20 relative z-10">
+          <h2 className="text-2xl md:text-3xl font-bold text-amber-500 mb-4 flex items-center gap-3">
+            <span>❖</span> رواد التوثيق الأوائل (جيل الرواد)
+          </h2>
+          <p className="text-slate-400 mb-8 text-base md:text-lg">
             لم تكن هذه النسخة الحديثة لترى النور لولا البذور الطيبة التي غرسها كبارنا في الماضي، ونذكر من أصحاب الفضل:
-          </motion.p>
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {pioneers.map((person, idx) => (
-              <motion.div key={idx} variants={fadeUp} className="bg-slate-900/80 border border-amber-900/30 rounded-2xl p-6 hover:border-amber-500/50 transition-all duration-300 shadow-lg shadow-black/50 group">
-                <h3 className="text-xl font-bold text-amber-300 mb-3 group-hover:text-amber-400">{person.name}</h3>
-                <p className="text-slate-400 leading-relaxed text-sm md:text-base">{person.desc}</p>
-              </motion.div>
+              <div key={idx} className="bg-slate-900/90 border border-amber-900/40 rounded-2xl p-6 hover:border-amber-500/50 transition-all shadow-md">
+                <h3 className="text-lg font-bold text-amber-300 mb-3">{person.name}</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">{person.desc}</p>
+              </div>
             ))}
           </div>
-        </motion.section>
+        </section>
 
-        {/* قسم صناع العمل الحديث */}
-        <motion.section initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer} className="mb-20">
-          <motion.h2 variants={fadeUp} className="text-3xl font-bold text-amber-500 mb-8 flex items-center gap-3">
-            <span className="text-xl">❖</span> رحلة التوثيق الحديثة (صُناع هذا العمل)
-          </motion.h2>
-          <motion.p variants={fadeUp} className="text-slate-400 mb-8 text-lg">
-            أما هذا الصرح الرقمي الذي بين أيديكم اليوم، فهو نتاج شهور طويلة من العمل المتواصل، والبحث، والمراجعة. ووراء هذا الإنجاز فريق عمل نذر وقته وجهده لخدمة العائلة:
-          </motion.p>
+        {/* قسم رحلة التوثيق الحديثة */}
+        <section className="mb-20 relative z-10">
+          <h2 className="text-2xl md:text-3xl font-bold text-amber-500 mb-4 flex items-center gap-3">
+            <span>❖</span> رحلة التوثيق الحديثة (صُناع هذا العمل)
+          </h2>
+          <p className="text-slate-400 mb-8 text-base md:text-lg">
+            أما هذا الصرح الرقمي الذي بين أيديكم اليوم، فهو نتاج شهور طويلة من العمل المتواصل، والبحث، والمراجعة، والمشاورة المستمرة. ووراء هذا الإنجاز فريق عمل نذر وقته وجهده لخدمة العائلة:
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {modernTeam.map((person, idx) => (
-              <motion.div key={idx} variants={fadeUp} className="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-amber-900/30 rounded-2xl p-6 hover:border-amber-500/50 transition-all duration-300 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-2 h-full bg-amber-600/50 group-hover:bg-amber-500 transition-colors" />
-                <h3 className="text-xl font-bold text-amber-300 mb-3 pr-4">{person.name}</h3>
-                <p className="text-slate-400 leading-relaxed text-sm md:text-base pr-4">{person.desc}</p>
-              </motion.div>
+              <div key={idx} className="bg-slate-900/90 border-r-4 border-r-amber-500 border border-slate-800 rounded-2xl p-6 hover:border-amber-500/40 transition-all">
+                <h3 className="text-lg font-bold text-amber-300 mb-2">{person.name}</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">{person.desc}</p>
+              </div>
             ))}
           </div>
-        </motion.section>
+        </section>
 
-        {/* قسم عظماء العائلة */}
-        <motion.section initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer} className="mb-20">
-          <motion.h2 variants={fadeUp} className="text-3xl font-bold text-amber-500 mb-8 flex items-center gap-3">
-            <span className="text-xl">❖</span> عظماء في ذاكرة العائلة
-          </motion.h2>
-          <motion.p variants={fadeUp} className="text-slate-400 mb-8 text-lg">
+        {/* قسم عظماء في ذاكرة العائلة */}
+        <section className="mb-20 relative z-10">
+          <h2 className="text-2xl md:text-3xl font-bold text-amber-500 mb-4 flex items-center gap-3">
+            <span>❖</span> عظماء في ذاكرة العائلة
+          </h2>
+          <p className="text-slate-400 mb-8 text-base md:text-lg">
             كما نرفع قبعات الاحترام والتقدير لشخصيات عظيمة كان لها دور بارز في تاريخ العائلة وحفظ كيانها، ونذكر منهم:
-          </motion.p>
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {greatFigures.map((person, idx) => (
-              <motion.div key={idx} variants={fadeUp} className="flex items-start gap-4 bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
-                <div className="w-12 h-12 rounded-full bg-amber-900/30 flex items-center justify-center shrink-0 border border-amber-700/50">
-                  <span className="text-amber-500 text-xl">♔</span>
+              <div key={idx} className="flex items-start gap-4 bg-slate-900/70 p-6 rounded-2xl border border-amber-900/30">
+                <div className="w-12 h-12 rounded-full bg-amber-950/60 border border-amber-700/50 flex items-center justify-center shrink-0">
+                  <span className="text-amber-400 text-xl">♔</span>
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-amber-200 mb-2">{person.name}</h3>
-                  <p className="text-slate-400 text-sm">{person.desc}</p>
+                  <p className="text-slate-400 text-sm leading-relaxed">{person.desc}</p>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
-        </motion.section>
+        </section>
 
-        {/* قسم الشكر الخاص */}
-        <motion.section initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer} className="mb-20 text-center">
-          <motion.h2 variants={fadeUp} className="text-2xl font-bold text-amber-500 mb-6">
-            شكر خاص وتقدير
-          </motion.h2>
-          <motion.p variants={fadeUp} className="text-slate-400 mb-6 max-w-2xl mx-auto">
+        {/* شكر خاص وتقدير */}
+        <section className="mb-20 text-center relative z-10">
+          <h2 className="text-2xl font-bold text-amber-500 mb-4">شكر خاص وتقدير</h2>
+          <p className="text-slate-400 mb-8 max-w-2xl mx-auto text-sm md:text-base">
             لا يسعنا في هذا المقام إلا أن نتقدم بخالص الشكر والتقدير لكل من شاركنا ولو بجهد يسير في بناء هذه الشجرة، ونخص بالذكر:
-          </motion.p>
-          <motion.div variants={fadeUp} className="flex flex-wrap justify-center gap-4">
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
             {specialThanks.map((name, idx) => (
-              <span key={idx} className="px-6 py-3 rounded-full bg-slate-800/80 border border-amber-900/40 text-amber-100 shadow-sm">
+              <span key={idx} className="px-5 py-2.5 rounded-full bg-slate-900 border border-amber-900/40 text-amber-200 text-sm font-medium">
                 {name}
               </span>
             ))}
-          </motion.div>
-        </motion.section>
+          </div>
+        </section>
 
         {/* الكلمة الختامية */}
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center bg-gradient-to-t from-amber-900/10 to-transparent p-10 rounded-3xl border border-amber-900/20">
+        <footer className="text-center bg-gradient-to-t from-amber-950/20 to-slate-900/40 p-10 rounded-3xl border border-amber-900/30 relative z-10">
           <div className="text-4xl text-amber-600 mb-4">❝</div>
-          <p className="text-xl text-slate-300 leading-loose max-w-3xl mx-auto font-light">
+          <p className="text-lg md:text-xl text-slate-300 leading-loose max-w-3xl mx-auto font-light">
             هذا الموقع هو هديتنا لكل فرد يحمل اسم <span className="text-amber-400 font-bold">"حويت"</span>. صممناه ليكون بيتاً كبيراً يجمعنا، وشجرة نستظل بها جميعاً. نسأل الله أن يديم بيننا المحبة والمودة، وأن تظل شجرتنا مثمرة وممتدة بالخير دائماً وأبداً.
           </p>
           <div className="flex items-center justify-center gap-4 mt-8 text-amber-500/50">
@@ -179,7 +178,7 @@ export default function AboutUsPage() {
             <span>✦</span>
             <span className="w-16 h-[1px] bg-amber-500/30"></span>
           </div>
-        </motion.div>
+        </footer>
 
       </div>
     </div>
