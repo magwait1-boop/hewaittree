@@ -95,23 +95,21 @@ export default function TreeCanvas({
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  // Attach non-passive touch event listeners to prevent browser zoom
+  // Cancel browser pinch gestures through a native non-passive listener.
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
 
-    const preventDefaultTouch = (e: TouchEvent) => {
-      if ('touches' in e && e.touches.length > 1 && e.cancelable) e.preventDefault();
+    const preventBrowserPinch = (e: TouchEvent) => {
+      if ('touches' in e && e.touches.length === 2 && e.cancelable) e.preventDefault();
     };
     const preventDefaultWheel = (e: WheelEvent) => { if (e.cancelable) e.preventDefault(); };
 
-    el.addEventListener('touchstart', preventDefaultTouch, { passive: false });
-    el.addEventListener('touchmove', preventDefaultTouch, { passive: false });
+    el.addEventListener('touchmove', preventBrowserPinch, { passive: false });
     el.addEventListener('wheel', preventDefaultWheel, { passive: false });
 
     return () => {
-      el.removeEventListener('touchstart', preventDefaultTouch);
-      el.removeEventListener('touchmove', preventDefaultTouch);
+      el.removeEventListener('touchmove', preventBrowserPinch);
       el.removeEventListener('wheel', preventDefaultWheel);
     };
   }, []);
@@ -172,7 +170,6 @@ export default function TreeCanvas({
 
   // Wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (e.cancelable) e.preventDefault();
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
     const clientX = e.clientX - rect.left;
