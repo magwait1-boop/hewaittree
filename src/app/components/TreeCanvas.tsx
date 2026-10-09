@@ -101,9 +101,9 @@ export default function TreeCanvas({
     if (!el) return;
 
     const preventDefaultTouch = (e: TouchEvent) => {
-      if (e.touches.length > 1) e.preventDefault();
+      if ('touches' in e && e.touches.length > 1 && e.cancelable) e.preventDefault();
     };
-    const preventDefaultWheel = (e: WheelEvent) => { e.preventDefault(); };
+    const preventDefaultWheel = (e: WheelEvent) => { if (e.cancelable) e.preventDefault(); };
 
     el.addEventListener('touchstart', preventDefaultTouch, { passive: false });
     el.addEventListener('touchmove', preventDefaultTouch, { passive: false });
@@ -172,17 +172,24 @@ export default function TreeCanvas({
 
   // Wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
     const clientX = e.clientX - rect.left;
     const clientY = e.clientY - rect.top;
     setView(v => {
-      const xs = (clientX - v.x) / v.scale;
-      const ys = (clientY - v.y) / v.scale;
+      const currentScale = Number.isFinite(v.scale) && v.scale > 0 ? v.scale : 1;
+      const currentX = Number.isFinite(v.x) ? v.x : 0;
+      const currentY = Number.isFinite(v.y) ? v.y : 0;
+      const xs = (clientX - currentX) / currentScale;
+      const ys = (clientY - currentY) / currentScale;
       const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      const ns = Math.max(0.05, Math.min(3, v.scale * factor));
-      return { x: clientX - xs * ns, y: clientY - ys * ns, scale: ns };
+      const rawScale = currentScale * factor;
+      if (!Number.isFinite(rawScale)) return { x: currentX, y: currentY, scale: currentScale };
+      const ns = Math.max(0.15, Math.min(3, rawScale));
+      const x = clientX - xs * ns;
+      const y = clientY - ys * ns;
+      return Number.isFinite(x) && Number.isFinite(y) ? { x, y, scale: ns } : { x: currentX, y: currentY, scale: currentScale };
     });
   }, [setView]);
 
@@ -199,7 +206,8 @@ export default function TreeCanvas({
       const pts = Array.from(activePointers.current.values());
       const dx = pts[1].x - pts[0].x;
       const dy = pts[1].y - pts[0].y;
-      lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
+      const initialPinchDist = Math.hypot(dx, dy);
+      lastPinchDist.current = initialPinchDist > 5 ? initialPinchDist : null;
       lastPinchMid.current = {
         x: (pts[0].x + pts[1].x) / 2,
         y: (pts[0].y + pts[1].y) / 2,
@@ -257,29 +265,36 @@ export default function TreeCanvas({
       const pts = Array.from(activePointers.current.values());
       const dx = pts[1].x - pts[0].x;
       const dy = pts[1].y - pts[0].y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.hypot(dx, dy);
       const mid = {
         x: (pts[0].x + pts[1].x) / 2,
         y: (pts[0].y + pts[1].y) / 2,
       };
 
-      if (lastPinchDist.current !== null && lastPinchMid.current !== null) {
+      const lastDist = lastPinchDist.current;
+      if (lastDist !== null && lastDist >= 5 && dist > 5 && lastPinchMid.current !== null) {
         const rect = svgRef.current?.getBoundingClientRect();
         if (rect) {
           const cx = mid.x - rect.left;
           const cy = mid.y - rect.top;
-          const ratio = dist / lastPinchDist.current;
+          const ratio = dist / lastDist;
+          if (!Number.isFinite(ratio)) return;
           setView(v => {
-            const xs = (cx - v.x) / v.scale;
-            const ys = (cy - v.y) / v.scale;
-            const ns = Math.max(0.05, Math.min(3, v.scale * ratio));
+            const currentScale = Number.isFinite(v.scale) && v.scale > 0 ? v.scale : 1;
+            const currentX = Number.isFinite(v.x) ? v.x : 0;
+            const currentY = Number.isFinite(v.y) ? v.y : 0;
+            const xs = (cx - currentX) / currentScale;
+            const ys = (cy - currentY) / currentScale;
+            const rawScale = currentScale * ratio;
+            if (!Number.isFinite(rawScale)) return { x: currentX, y: currentY, scale: currentScale };
+            const ns = Math.max(0.15, Math.min(3, rawScale));
             const pmx = mid.x - lastPinchMid.current!.x;
             const pmy = mid.y - lastPinchMid.current!.y;
-            return {
-              x: cx - xs * ns + pmx,
-              y: cy - ys * ns + pmy,
-              scale: ns,
-            };
+            const x = cx - xs * ns + pmx;
+            const y = cy - ys * ns + pmy;
+            return Number.isFinite(ns) && Number.isFinite(x) && Number.isFinite(y)
+              ? { x, y, scale: ns }
+              : { x: currentX, y: currentY, scale: currentScale };
           });
         }
       }
@@ -290,18 +305,18 @@ export default function TreeCanvas({
     }
 
     if (isDraggingNode.current && dragNodeId.current) {
-      const dx = (e.clientX - dragStart.current.clientX) / view.scale;
-      const dy = (e.clientY - dragStart.current.clientY) / view.scale;
+      const safeScale = Number.isFinite(view.scale) && view.scale > 0 ? view.scale : 1;
+      const dx = (e.clientX - dragStart.current.clientX) / safeScale;
+      const dy = (e.clientY - dragStart.current.clientY) / safeScale;
+      if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
       dragStart.current = { clientX: e.clientX, clientY: e.clientY };
       onNodeDrag(dragNodeId.current, dx, dy);
       return;
     }
     if (isPanning.current) {
-      setView(v => ({
-        ...v,
-        x: panStart.current.vx + (e.clientX - panStart.current.x),
-        y: panStart.current.vy + (e.clientY - panStart.current.y),
-      }));
+      const x = panStart.current.vx + (e.clientX - panStart.current.x);
+      const y = panStart.current.vy + (e.clientY - panStart.current.y);
+      if (Number.isFinite(x) && Number.isFinite(y)) setView(v => ({ ...v, x, y }));
     }
   }, [view.scale, onNodeDrag, setView]);
 
@@ -468,12 +483,18 @@ export default function TreeCanvas({
     };
   }, [isPrinting, canvasSize.w, canvasSize.h]);
 
+  const safeZoom = Number.isFinite(view.scale) && view.scale > 0 ? view.scale : 1;
+  const safeX = Number.isFinite(view.x) ? view.x : 0;
+  const safeY = Number.isFinite(view.y) ? view.y : 0;
+  const transform = `translate(${safeX}, ${safeY}) scale(${safeZoom})`;
+
   return (
     <svg
       ref={svgRef}
       width={canvasSize.w}
       height={canvasSize.h}
       style={{ display: 'block', userSelect: 'none', touchAction: 'none' }}
+      className="touch-none"
       onWheel={handleWheel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -507,7 +528,7 @@ export default function TreeCanvas({
         style={{ cursor: 'default' }}
       />
 
-      <g transform={`translate(${view.x}, ${view.y}) scale(${view.scale})`}>
+      <g transform={transform}>
         {/* Edges */}
         <g>
           {visibleEdges.map(child => {
