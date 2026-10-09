@@ -95,21 +95,6 @@ export default function TreeCanvas({
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  // Keep wheel zoom local to the canvas. Touch gestures are handled by pointer
-  // events and CSS touch-action, without canceling touch events in JavaScript.
-  useEffect(() => {
-    const el = svgRef.current;
-    if (!el) return;
-
-    const preventDefaultWheel = (e: WheelEvent) => { if (e.cancelable) e.preventDefault(); };
-
-    el.addEventListener('wheel', preventDefaultWheel, { passive: false });
-
-    return () => {
-      el.removeEventListener('wheel', preventDefaultWheel);
-    };
-  }, []);
-
   // Virtual rendering — only draw nodes in viewport + padding
   const PADDING = 300;
   const visiblePersons = isPrinting
@@ -165,7 +150,7 @@ export default function TreeCanvas({
   }, [getGenOverride]);
 
   // Wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
+  const handleWheel = useCallback((e: WheelEvent) => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
     const clientX = e.clientX - rect.left;
@@ -185,6 +170,21 @@ export default function TreeCanvas({
       return Number.isFinite(x) && Number.isFinite(y) ? { x, y, scale: ns } : { x: currentX, y: currentY, scale: currentScale };
     });
   }, [setView]);
+
+  // Attach wheel zoom natively so the listener is explicitly non-passive.
+  // Touch interactions use pointer events and CSS touch-action only.
+  useEffect(() => {
+    const element = svgRef.current;
+    if (!element) return;
+
+    const handleNativeWheel = (event: WheelEvent) => {
+      if (event.cancelable) event.preventDefault();
+      handleWheel(event);
+    };
+
+    element.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleNativeWheel);
+  }, [handleWheel]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -493,9 +493,8 @@ export default function TreeCanvas({
       ref={svgRef}
       width={canvasSize.w}
       height={canvasSize.h}
-      style={{ display: 'block', userSelect: 'none', touchAction: 'none' }}
+      style={{ display: 'block', userSelect: 'none', touchAction: 'none', overscrollBehavior: 'none' }}
       className="touch-none"
-      onWheel={handleWheel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

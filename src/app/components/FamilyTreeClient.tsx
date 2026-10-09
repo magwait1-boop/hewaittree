@@ -815,7 +815,10 @@ export default function FamilyTreeClient() {
       />
 
       {/* Tree Canvas */}
-      <div className="absolute inset-0 pt-[112px] tree-canvas-wrap touch-none" style={{ touchAction: 'none' }}>
+      <div
+        className="absolute inset-0 pt-[112px] tree-canvas-wrap touch-none"
+        style={{ touchAction: 'none', overscrollBehavior: 'none' }}
+      >
         <CanvasErrorBoundary key={canvasRecoveryKey} onError={recoverCanvas}>
           <TreeCanvas
             persons={persons}
