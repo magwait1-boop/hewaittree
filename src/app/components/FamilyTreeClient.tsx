@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { MOCK_PERSONS, DEFAULT_SETTINGS, LOCAL_SETTINGS_PENDING_KEY, SYSTEM_USERS, buildChildrenMap, buildPersonMap, buildNameIndex, searchPersons, normalizeSettings, type Person, type PendingRequest, type AppSettings,  } from '@/lib/familyData';
 import {
@@ -44,6 +44,41 @@ export interface ViewState {
   scale: number;
 }
 
+function sanitizeView(view: ViewState): ViewState {
+  const safeZoom = Math.min(Math.max(Number.isFinite(view.scale) ? view.scale : 1, 0.2), 3.0);
+  const safePanX = Number.isFinite(view.x) ? Math.round(view.x) : 0;
+  const safePanY = Number.isFinite(view.y) ? Math.round(view.y) : 0;
+  return { x: safePanX, y: safePanY, scale: safeZoom };
+}
+
+interface CanvasErrorBoundaryProps {
+  children: ReactNode;
+  onError: () => void;
+}
+
+interface CanvasErrorBoundaryState {
+  hasError: boolean;
+}
+
+class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, CanvasErrorBoundaryState> {
+  state: CanvasErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): CanvasErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(_error: Error, _info: ErrorInfo) {
+    this.props.onError();
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="h-full w-full" role="status" aria-label="جارٍ استعادة عرض الشجرة" />;
+    }
+    return this.props.children;
+  }
+}
+
 export interface CurrentUser {
   username: string;
   role: 'admin' | 'supervisor';
@@ -53,6 +88,18 @@ export default function FamilyTreeClient() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [view, setView] = useState<ViewState>({ x: 0, y: 0, scale: 0.18 });
+  const [canvasRecoveryKey, setCanvasRecoveryKey] = useState(0);
+  const canvasRecoveryAttempted = useRef(false);
+  const setSafeView = useCallback<React.Dispatch<React.SetStateAction<ViewState>>>((next) => {
+    setView(current => sanitizeView(typeof next === 'function' ? next(current) : next));
+  }, []);
+  const recoverCanvas = useCallback(() => {
+    setSafeView({ x: 0, y: 0, scale: 1 });
+    if (!canvasRecoveryAttempted.current) {
+      canvasRecoveryAttempted.current = true;
+      setCanvasRecoveryKey(key => key + 1);
+    }
+  }, [setSafeView]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [sidebarNodeId, setSidebarNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -317,8 +364,8 @@ export default function FamilyTreeClient() {
     const s = Math.min(scaleX, scaleY, 0.5);
     const midX = (minX + maxX) / 2;
     const midY = (minY + maxY) / 2;
-    setView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
-  }, [persons]);
+    setSafeView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
+  }, [persons, setSafeView]);
 
   const centerOnNode = useCallback((id: string) => {
     const p = personMap.get(id);
@@ -326,8 +373,8 @@ export default function FamilyTreeClient() {
     const W = typeof window !== 'undefined' ? window.innerWidth : 1440;
     const H = typeof window !== 'undefined' ? window.innerHeight - 120 : 800;
     const s = 1.3;
-    setView({ x: W / 2 - p.manualX * s, y: H / 2 - p.manualY * s, scale: s });
-  }, [personMap]);
+    setSafeView({ x: W / 2 - p.manualX * s, y: H / 2 - p.manualY * s, scale: s });
+  }, [personMap, setSafeView]);
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
@@ -373,9 +420,10 @@ export default function FamilyTreeClient() {
     setShowNodeModal(true);
   }, [currentUser, personMap]);
 
-  const handleZoom = useCallback((factor: number) => {
-    setView(v => ({ ...v, scale: Math.max(0.05, Math.min(3, v.scale * factor)) }));
-  }, []);
+  const handleZoomChange = useCallback((zoom: number) => {
+    if (!Number.isFinite(zoom)) return;
+    setSafeView(v => ({ ...v, scale: zoom }));
+  }, [setSafeView]);
 
   const handleFitToView = useCallback(() => {
     if (persons.length === 0) return;
@@ -388,8 +436,8 @@ export default function FamilyTreeClient() {
     const s = Math.min((W - 100) / (maxX - minX || 1), (H - 100) / (maxY - minY || 1), 0.5);
     const midX = (minX + maxX) / 2;
     const midY = (minY + maxY) / 2;
-    setView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
-  }, [persons]);
+    setSafeView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
+  }, [persons, setSafeView]);
 
   const handleLogin = useCallback((username: string, password: string): boolean => {
     const user = SYSTEM_USERS[username];
@@ -767,31 +815,33 @@ export default function FamilyTreeClient() {
       />
 
       {/* Tree Canvas */}
-      <div className="absolute inset-0 pt-[112px] tree-canvas-wrap">
-        <TreeCanvas
-          persons={persons}
-          view={view}
-          setView={setView}
-          settings={settings}
-          searchMatches={searchMatches}
-          selectedIds={selectedIds}
-          sidebarNodeId={sidebarNodeId}
-          onNodeClick={handleNodeClick}
-          onNodeDblClick={handleNodeDblClick}
-          onNodeDrag={handleNodeDrag}
-          onEdgeClick={setEdgeStylePersonId}
-          canEditEdges={currentUser?.role === 'admin'}
-          canDrag={currentUser?.role === 'admin'}
-          personMap={personMap}
-          childrenMap={childrenMap}
-          onBgClick={() => {
-            setSelectedIds(new Set());
-            setSidebarNodeId(null);
-            setIsSidebarOpen(false);
-          }}
-          isPrinting={isPrinting}
-          onPrintDone={() => setIsPrinting(false)}
-        />
+      <div className="absolute inset-0 pt-[112px] tree-canvas-wrap touch-none" style={{ touchAction: 'none' }}>
+        <CanvasErrorBoundary key={canvasRecoveryKey} onError={recoverCanvas}>
+          <TreeCanvas
+            persons={persons}
+            view={view}
+            setView={setSafeView}
+            settings={settings}
+            searchMatches={searchMatches}
+            selectedIds={selectedIds}
+            sidebarNodeId={sidebarNodeId}
+            onNodeClick={handleNodeClick}
+            onNodeDblClick={handleNodeDblClick}
+            onNodeDrag={handleNodeDrag}
+            onEdgeClick={setEdgeStylePersonId}
+            canEditEdges={currentUser?.role === 'admin'}
+            canDrag={currentUser?.role === 'admin'}
+            personMap={personMap}
+            childrenMap={childrenMap}
+            onBgClick={() => {
+              setSelectedIds(new Set());
+              setSidebarNodeId(null);
+              setIsSidebarOpen(false);
+            }}
+            isPrinting={isPrinting}
+            onPrintDone={() => setIsPrinting(false)}
+          />
+        </CanvasErrorBoundary>
       </div>
 
       {/* Sidebar */}
@@ -815,7 +865,7 @@ export default function FamilyTreeClient() {
       </div>
 
       {/* Zoom Controls */}
-      <ZoomControls onZoomIn={() => handleZoom(1.2)} onZoomOut={() => handleZoom(0.8)} onFit={handleFitToView} />
+      <ZoomControls zoom={view.scale} onZoomChange={handleZoomChange} onFit={handleFitToView} />
 
       {/* Modals */}
       {showAuthModal && (

@@ -95,21 +95,17 @@ export default function TreeCanvas({
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  // Cancel browser pinch gestures through a native non-passive listener.
+  // Keep wheel zoom local to the canvas. Touch gestures are handled by pointer
+  // events and CSS touch-action, without canceling touch events in JavaScript.
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
 
-    const preventBrowserPinch = (e: TouchEvent) => {
-      if ('touches' in e && e.touches.length === 2 && e.cancelable) e.preventDefault();
-    };
     const preventDefaultWheel = (e: WheelEvent) => { if (e.cancelable) e.preventDefault(); };
 
-    el.addEventListener('touchmove', preventBrowserPinch, { passive: false });
     el.addEventListener('wheel', preventDefaultWheel, { passive: false });
 
     return () => {
-      el.removeEventListener('touchmove', preventBrowserPinch);
       el.removeEventListener('wheel', preventDefaultWheel);
     };
   }, []);
@@ -183,7 +179,7 @@ export default function TreeCanvas({
       const factor = e.deltaY > 0 ? 0.9 : 1.1;
       const rawScale = currentScale * factor;
       if (!Number.isFinite(rawScale)) return { x: currentX, y: currentY, scale: currentScale };
-      const ns = Math.max(0.15, Math.min(3, rawScale));
+      const ns = Math.max(0.2, Math.min(3, rawScale));
       const x = clientX - xs * ns;
       const y = clientY - ys * ns;
       return Number.isFinite(x) && Number.isFinite(y) ? { x, y, scale: ns } : { x: currentX, y: currentY, scale: currentScale };
@@ -204,7 +200,7 @@ export default function TreeCanvas({
       const dx = pts[1].x - pts[0].x;
       const dy = pts[1].y - pts[0].y;
       const initialPinchDist = Math.hypot(dx, dy);
-      lastPinchDist.current = initialPinchDist > 5 ? initialPinchDist : null;
+      lastPinchDist.current = initialPinchDist >= 10 ? initialPinchDist : null;
       lastPinchMid.current = {
         x: (pts[0].x + pts[1].x) / 2,
         y: (pts[0].y + pts[1].y) / 2,
@@ -269,7 +265,14 @@ export default function TreeCanvas({
       };
 
       const lastDist = lastPinchDist.current;
-      if (lastDist !== null && lastDist >= 5 && dist > 5 && lastPinchMid.current !== null) {
+      const prevDistance = lastDist;
+      const currentDistance = dist;
+      if (!prevDistance || prevDistance < 10 || currentDistance < 10) {
+        lastPinchDist.current = dist;
+        lastPinchMid.current = mid;
+        return;
+      }
+      if (lastPinchMid.current !== null) {
         const rect = svgRef.current?.getBoundingClientRect();
         if (rect) {
           const cx = mid.x - rect.left;
@@ -284,7 +287,7 @@ export default function TreeCanvas({
             const ys = (cy - currentY) / currentScale;
             const rawScale = currentScale * ratio;
             if (!Number.isFinite(rawScale)) return { x: currentX, y: currentY, scale: currentScale };
-            const ns = Math.max(0.15, Math.min(3, rawScale));
+            const ns = Math.max(0.2, Math.min(3, rawScale));
             const pmx = mid.x - lastPinchMid.current!.x;
             const pmy = mid.y - lastPinchMid.current!.y;
             const x = cx - xs * ns + pmx;
@@ -480,10 +483,10 @@ export default function TreeCanvas({
     };
   }, [isPrinting, canvasSize.w, canvasSize.h]);
 
-  const safeZoom = Number.isFinite(view.scale) && view.scale > 0 ? view.scale : 1;
-  const safeX = Number.isFinite(view.x) ? view.x : 0;
-  const safeY = Number.isFinite(view.y) ? view.y : 0;
-  const transform = `translate(${safeX}, ${safeY}) scale(${safeZoom})`;
+  const safeZoom = Math.min(Math.max(Number.isFinite(view.scale) ? view.scale : 1, 0.2), 3.0);
+  const safePanX = Number.isFinite(view.x) ? Math.round(view.x) : 0;
+  const safePanY = Number.isFinite(view.y) ? Math.round(view.y) : 0;
+  const transformStr = `translate(${safePanX}, ${safePanY}) scale(${safeZoom})`;
 
   return (
     <svg
@@ -525,7 +528,7 @@ export default function TreeCanvas({
         style={{ cursor: 'default' }}
       />
 
-      <g transform={transform}>
+      <g transform={transformStr}>
         {/* Edges */}
         <g>
           {visibleEdges.map(child => {
