@@ -1,223 +1,232 @@
-'use client';
-
-import React from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Fragment } from 'react';
+import { aboutContent, type AboutBlock } from './content';
+import styles from './page.module.css';
 
-const modernTeam = [
-  {
-    name: "الدكتور رأفت عبدالفتاح حويت (حفظه الله)",
-    desc: "مرجعنا الأصيل الذي لم يبخل علينا يوماً بوقته أو بذاكرته. ورغم مشقة البحث والتوثيق، لم يتكاسل أبداً عن تقديم أي معلومة أو نصيحة تُنير لنا الطريق في تجميع وتدقيق فروع الشجرة."
-  },
-  {
-    name: "المهندس مجدي السيد حويت",
-    desc: "المؤسس الحقيقي لهذا المشروع بشكله الرقمي. أخذ على عاتقه نقل شجرة العائلة من الورق إلى عالم التكنولوجيا، وقام بجمع وتنسيق قاعدة بيانات ضخمة، وتطوير تطبيق حديث لإدارة الشجرة. وبعد تجارب وتحديثات مستمرة، خرج لنا الموقع بهذا الشكل التفاعلي المتميز الذي نواصل تطويره يوماً بعد يوم."
-  },
-  {
-    name: "المهندس عبداللطيف طه حويت",
-    desc: "صاحب الهمة العالية والمجهود الجبار في التواصل المباشر. هذا الرجل المحب لعائلته أخذ على عاتقه الاتصال بمعظم أفراد العائلة فرداً فرداً، للبحث والسؤال عن تفاصيل أجدادهم وأبنائهم، فكان له الفضل الأكبر في تجميع هذا الكم الهائل من الأسماء، وخاصة فرع سيدي العفيفي."
-  },
-  {
-    name: "الأستاذ سلامة حويت",
-    desc: "الأب الروحي والداعم الدائم لهذا المشروع. لم يبخل علينا بتوجيهاته، وكان دائم السؤال عن تفاصيل العمل وآخر المستجدات، يزرع فينا الأمل ويبث فينا العزيمة لإخراج هذا العمل بأفضل صورة."
+export const metadata: Metadata = {
+  title: 'من نحن | عائلة حويت',
+  description: 'عائلة حويت… تاريخ نحفظه، ورحم نصله، وإرث نورثه',
+};
+
+function InlineText({ text }: { text: string }) {
+  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).map((part, index) => {
+    if (part.startsWith('**')) {
+      return (
+        <strong key={index} className="font-bold text-amber-200">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith('*')) {
+      return (
+        <em key={index} className="not-italic text-amber-300/80">
+          {part.slice(1, -1)}
+        </em>
+      );
+    }
+    return <Fragment key={index}>{part}</Fragment>;
+  });
+}
+
+function ContentBlock({ block }: { block: AboutBlock }) {
+  if (block.kind === 'divider') {
+    return <hr className="my-8 border-amber-500/20" />;
   }
-];
-
-const pioneers = [
-  {
-    name: "الشيخ منصور أحمد حويت (رحمه الله)",
-    desc: "الذي بذل جهداً مضنياً ومشكوراً في جمع وتوثيق عدد كبير من أفراد العائلة بشكل سردي دقيق، ليكون نواة لعملنا اليوم."
-  },
-  {
-    name: "الحاج السيد موسى حويت (رحمه الله)",
-    desc: "الذي أبدع في تصميم شجرة خاصة بـ \"فرع المكنة\"، ورسمها بحب وإتقان في لوحة فنية راقية تتفرع منها الأغصان والأوراق لتحفظ أسماء الأجداد."
-  },
-  {
-    name: "الأستاذ محمد عبدالوهاب حويت",
-    desc: "الذي استكمل المسيرة بجمع أفراد فرع المكنة بشكل سردي، في جهد طيب ومشكور حفظ الكثير من تفاصيل الفرع."
+  if (block.kind === 'list') {
+    return (
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {block.items.map((name) => (
+          <li
+            key={name}
+            className="flex items-start gap-3 rounded-xl border border-amber-900/40 bg-slate-950/50 px-4 py-3 text-sm leading-7 text-amber-100 sm:text-base"
+          >
+            <span aria-hidden="true" className="mt-1 text-amber-500">
+              ✦
+            </span>
+            <span>{name}</span>
+          </li>
+        ))}
+      </ul>
+    );
   }
-];
-
-const specialThanks = [
-  "الأستاذ أسامة محمد عبدالمجيد حويت",
-  "الأستاذ ثروت موسى حويت",
-  "الأستاذ محمد عبدالعظيم حويت",
-  "الاستاذ احمد علي عبدالخالق حويت",
-  "الدكتور عمر جازي ابواليزيد حويت"
-];
-
-const greatFigures = [
-  {
-    name: "عميد الحويتة الحاج محمد عبدالمجيد حويت (رحمه الله)",
-    desc: "الذي كان رمزاً للحكمة والجمع الطيب."
-  },
-  {
-    name: "المهندس جازي أبو اليزيد حويت (حفظه الله)",
-    desc: "صاحب المكانة المرموقة والعطاء المستمر."
+  if (block.kind === 'heading') {
+    return (
+      <h3 className="text-xl font-bold leading-relaxed text-amber-300 sm:text-2xl">{block.text}</h3>
+    );
   }
-];
+  return (
+    <p className="text-base leading-[2] text-slate-300 sm:text-lg">
+      <InlineText text={block.text} />
+    </p>
+  );
+}
+
+const sections: { title: string; blocks: AboutBlock[] }[] = [];
+const introduction: AboutBlock[] = [];
+for (const block of aboutContent.slice(3)) {
+  if (block.kind === 'heading' && block.level === 2) {
+    sections.push({ title: block.text, blocks: [] });
+  } else if (sections.length) {
+    sections[sections.length - 1].blocks.push(block);
+  } else {
+    introduction.push(block);
+  }
+}
+
+function SectionContent({ blocks }: { blocks: AboutBlock[] }) {
+  const lead: AboutBlock[] = [];
+  const cards: { title: string; blocks: AboutBlock[] }[] = [];
+  const ending: AboutBlock[] = [];
+  for (const block of blocks) {
+    if (block.kind === 'heading' && block.level === 3) {
+      cards.push({ title: block.text, blocks: [] });
+    } else if (cards.length) {
+      cards[cards.length - 1].blocks.push(block);
+    } else {
+      lead.push(block);
+    }
+  }
+  // The final tribute belongs to the whole team, after the four biographies.
+  if (cards.length === 4) {
+    const lastCard = cards[cards.length - 1];
+    const tribute = lastCard.blocks.pop();
+    if (tribute) ending.push(tribute);
+  }
+  return (
+    <>
+      <div className="space-y-5">
+        {lead.map((block, index) => (
+          <ContentBlock key={index} block={block} />
+        ))}
+      </div>
+      {cards.length > 0 && (
+        <div className="mt-8 grid items-start gap-5 md:grid-cols-2">
+          {cards.map((card) => (
+            <article
+              key={card.title}
+              className="space-y-4 rounded-2xl border border-slate-800 border-r-4 border-r-amber-500 bg-slate-900/90 p-5 sm:p-7"
+            >
+              <h3 className="text-xl font-bold leading-relaxed text-amber-300">{card.title}</h3>
+              {card.blocks.map((block, index) => (
+                <ContentBlock key={index} block={block} />
+              ))}
+            </article>
+          ))}
+        </div>
+      )}
+      {ending.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-amber-900/40 bg-amber-950/20 p-5 sm:p-7">
+          {ending.map((block, index) => (
+            <ContentBlock key={index} block={block} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function AboutUsPage() {
   return (
-    <div 
-      dir="rtl" 
-      className="custom-about-scroll fixed inset-0 w-screen h-screen overflow-y-scroll bg-slate-950 text-slate-200 z-50 selection:bg-amber-600 selection:text-white"
+    <div
+      dir="rtl"
+      className={`${styles.page} fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-slate-950 text-slate-200 selection:bg-amber-600 selection:text-white`}
     >
-      {/* تخصيص مظهر شريط التمرير ليتناسق تماماً مع الخلفية */}
-      <style jsx global>{`
-        /* إتاحة التمرير لشاشات المتصفح الحديثة */
-        .custom-about-scroll {
-          scrollbar-width: thin;
-          scrollbar-color: #78350f #020617;
-        }
-
-        /* تخصيص ألوان وتصميم الـ Scrollbar لمتصفحات كروم وإيدج وسفاري */
-        .custom-about-scroll::-webkit-scrollbar {
-          width: 10px;
-        }
-        .custom-about-scroll::-webkit-scrollbar-track {
-          background: #020617; /* نفس لون خلفية الصفحة slate-950 تماماً */
-        }
-        .custom-about-scroll::-webkit-scrollbar-thumb {
-          background-color: #78350f; /* لون عنبري ذهبي داكن وأنيق */
-          border-radius: 6px;
-          border: 2px solid #020617; /* فراغ لوني متطابق مع الخلفية */
-        }
-        .custom-about-scroll::-webkit-scrollbar-thumb:hover {
-          background-color: #b45309; /* إضاءة ذهبية خفيفة عند التمرير بالماوس */
-        }
-      `}</style>
-
-      {/* شريط علوي للعودة والتنقل */}
-      <header className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-md border-b border-amber-900/30 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-amber-500 text-xl font-bold">عائلة حويت</span>
-          <span className="text-xs text-amber-500/70 border border-amber-500/30 px-2 py-0.5 rounded-full">وثيقة وفاء وتاريخ</span>
+      <header className="sticky top-0 z-20 border-b border-amber-900/30 bg-slate-950/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
+          <div>
+            <Link href="/about" className="text-lg font-bold text-amber-400 sm:text-xl">
+              عائلة حويت
+            </Link>
+            <p className="hidden text-xs text-slate-400 sm:block">وثيقة وفاء وتاريخ</p>
+          </div>
+          <Link
+            href="/"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-600/15 px-3 py-2 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-600/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-400 sm:px-4"
+          >
+            <span aria-hidden="true">←</span> العودة إلى الشجرة
+          </Link>
         </div>
-        <Link 
-          href="/" 
-          className="inline-flex items-center gap-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-        >
-          <span>←</span> العودة إلى الشجرة
-        </Link>
       </header>
 
-      {/* المحتوى الرئيسي */}
-      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-600/10 blur-[130px] rounded-full pointer-events-none" />
-
-        {/* عنوان الصفحة */}
-        <section className="text-center mb-16 relative z-10">
-          <div className="flex items-center justify-center gap-4 mb-4 text-amber-500">
-            <span className="w-12 h-[1px] bg-amber-500/50"></span>
-            <span className="text-2xl">۞</span>
-            <span className="w-12 h-[1px] bg-amber-500/50"></span>
+      <main className="relative mx-auto max-w-6xl px-4 pb-12 pt-10 sm:px-6 sm:py-16 lg:px-8">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-64 max-w-full rounded-full bg-amber-600/10 blur-[100px]"
+        />
+        <section aria-labelledby="about-title" className="relative mb-10 text-center sm:mb-14">
+          <p className="mb-6 text-4xl leading-relaxed text-amber-300 sm:text-5xl">﷽</p>
+          <div
+            aria-hidden="true"
+            className="mb-5 flex items-center justify-center gap-4 text-amber-500"
+          >
+            <span className="h-px w-12 bg-amber-500/40" />۞
+            <span className="h-px w-12 bg-amber-500/40" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-600 pb-2">
-            جذور ممتدة وأغصان مثمرة
+          <h1
+            id="about-title"
+            className="bg-gradient-to-l from-amber-200 via-amber-400 to-amber-600 bg-clip-text pb-3 text-3xl font-bold leading-relaxed text-transparent sm:text-5xl"
+          >
+            من نحن | عائلة حويت
           </h1>
+          <p className="mx-auto mt-3 max-w-2xl text-lg leading-loose text-amber-200/90 sm:text-2xl">
+            عائلة حويت… تاريخ نحفظه، ورحم نصله، وإرث نورثه
+          </p>
+          <div className="mx-auto mt-8 max-w-3xl space-y-5 rounded-3xl border border-amber-900/40 bg-slate-900/70 p-5 sm:p-8">
+            {introduction.map((block, index) => (
+              <ContentBlock key={index} block={block} />
+            ))}
+          </div>
         </section>
 
-        {/* قسم رحلة التوثيق الحديثة */}
-        <section className="mb-20 relative z-10">
-          <h2 className="text-2xl md:text-3xl font-bold text-amber-500 mb-4 flex items-center gap-3">
-            <span>❖</span> رحلة التوثيق الحديثة (صُناع هذا العمل)
-          </h2>
-          <p className="text-slate-400 mb-8 text-base md:text-lg">
-            أما هذا الصرح الرقمي الذي بين أيديكم اليوم، فهو نتاج شهور طويلة من العمل المتواصل، والبحث، والمراجعة، والمشاورة المستمرة. ووراء هذا الإنجاز فريق عمل نذر وقته وجهده لخدمة العائلة:
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {modernTeam.map((person, idx) => (
-              <div key={idx} className="bg-slate-900/90 border-r-4 border-r-amber-500 border border-slate-800 rounded-2xl p-6 hover:border-amber-500/40 transition-all">
-                <h3 className="text-lg font-bold text-amber-300 mb-2">{person.name}</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">{person.desc}</p>
+        <nav
+          aria-label="أقسام صفحة من نحن"
+          className="relative mb-10 flex flex-wrap justify-center gap-2 sm:mb-14"
+        >
+          {['عن العائلة', 'رحلة التوثيق', 'جهود سابقة', 'شكر وتقدير', 'رسالتنا', 'كلمة أخيرة'].map(
+            (label, index) => (
+              <a
+                key={label}
+                href={`#about-section-${index}`}
+                className="inline-flex min-h-11 items-center rounded-full border border-amber-900/40 bg-slate-900 px-4 py-2 text-sm text-amber-200 transition-colors hover:border-amber-500/60 hover:bg-amber-950/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              >
+                {label}
+              </a>
+            )
+          )}
+        </nav>
+
+        <div className="relative space-y-8 sm:space-y-12">
+          {sections.map((section, index) => (
+            <section
+              key={section.title}
+              id={`about-section-${index}`}
+              aria-labelledby={`about-heading-${index}`}
+              className="scroll-mt-28 rounded-3xl border border-amber-900/30 bg-slate-900/40 p-5 sm:p-8 lg:p-10"
+            >
+              <div className="mb-6 flex items-start gap-3 sm:mb-8">
+                <span aria-hidden="true" className="mt-1 text-xl text-amber-500">
+                  ❖
+                </span>
+                <h2
+                  id={`about-heading-${index}`}
+                  className="text-xl font-bold leading-relaxed text-amber-400 sm:text-3xl"
+                >
+                  {section.title}
+                </h2>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* نبذة عن العائلة والموقع */}
-        <section className="mb-20 relative z-10">
-          <h2 className="text-2xl md:text-3xl font-bold text-amber-500 mb-4 flex items-center gap-3">
-            <span>❖</span> نبذة عن العائلة والموقع
-          </h2>
-          <div className="bg-slate-900/70 p-8 rounded-2xl border border-amber-900/30">
-            <p className="text-lg leading-relaxed text-slate-300 font-light">
-              أهلاً بكم في الموقع الرسمي لشجرة عائلة <span className="text-amber-400 font-bold">"حويت"</span>.
-              نحن عائلة نعتز بجذورنا الأصيلة الممتدة لقبيلة الحويطات العريقة، وبأجدادنا الذين سطروا تاريخاً من العزة والمحبة والأصالة. هذا الموقع لم يُبنَ في يوم وليلة، بل هو ثمرة حب، وحلم توارثته الأجيال لربط الماضي بالحاضر، وتوثيق صلة الرحم لتكون شجرتنا مرجعاً ووثيقة فخر لكل ابن وحفيد.
-            </p>
-          </div>
-        </section>
-
-        {/* قسم جيل الرواد */}
-        <section className="mb-20 relative z-10">
-          <h2 className="text-2xl md:text-3xl font-bold text-amber-500 mb-4 flex items-center gap-3">
-            <span>❖</span> رواد التوثيق الأوائل (جيل الرواد)
-          </h2>
-          <p className="text-slate-400 mb-8 text-base md:text-lg">
-            لم تكن هذه النسخة الحديثة لترى النور لولا البذور الطيبة التي غرسها كبارنا في الماضي، ونذكر من أصحاب الفضل:
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {pioneers.map((person, idx) => (
-              <div key={idx} className="bg-slate-900/90 border border-amber-900/40 rounded-2xl p-6 hover:border-amber-500/50 transition-all shadow-md">
-                <h3 className="text-lg font-bold text-amber-300 mb-3">{person.name}</h3>
-                <p className="text-slate-400 text-sm leading-relaxed">{person.desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* شكر خاص وتقدير */}
-        <section className="mb-20 text-center relative z-10">
-          <h2 className="text-2xl font-bold text-amber-500 mb-4">شكر خاص وتقدير</h2>
-          <p className="text-slate-400 mb-8 max-w-2xl mx-auto text-sm md:text-base">
-            لا يسعنا في هذا المقام إلا أن نتقدم بخالص الشكر والتقدير لكل من شاركنا ولو بجهد يسير في بناء هذه الشجرة، ونخص بالذكر:
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {specialThanks.map((name, idx) => (
-              <span key={idx} className="px-5 py-2.5 rounded-full bg-slate-900 border border-amber-900/40 text-amber-200 text-sm font-medium">
-                {name}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        {/* قسم عظماء في ذاكرة العائلة */}
-        <section className="mb-20 relative z-10">
-          <h2 className="text-2xl md:text-3xl font-bold text-amber-500 mb-4 flex items-center gap-3">
-            <span>❖</span> عظماء في ذاكرة العائلة
-          </h2>
-          <p className="text-slate-400 mb-8 text-base md:text-lg">
-            كما نرفع قبعات الاحترام والتقدير لشخصيات عظيمة كان لها دور بارز في تاريخ العائلة وحفظ كيانها، ونذكر منهم:
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {greatFigures.map((person, idx) => (
-              <div key={idx} className="flex items-start gap-4 bg-slate-900/70 p-6 rounded-2xl border border-amber-900/30">
-                <div className="w-12 h-12 rounded-full bg-amber-950/60 border border-amber-700/50 flex items-center justify-center shrink-0">
-                  <span className="text-amber-400 text-xl">♔</span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-amber-200 mb-2">{person.name}</h3>
-                  <p className="text-slate-400 text-sm leading-relaxed">{person.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* الكلمة الختامية */}
-        <footer className="text-center bg-gradient-to-t from-amber-950/20 to-slate-900/40 p-10 rounded-3xl border border-amber-900/30 relative z-10">
-          <div className="text-4xl text-amber-600 mb-4">❝</div>
-          <p className="text-lg md:text-xl text-slate-300 leading-loose max-w-3xl mx-auto font-light">
-            هذا الموقع هو هديتنا لكل فرد يحمل اسم <span className="text-amber-400 font-bold">"حويت"</span>. صممناه ليكون بيتاً كبيراً يجمعنا، وشجرة نستظل بها جميعاً. نسأل الله أن يديم بيننا المحبة والمودة، وأن تظل شجرتنا مثمرة وممتدة بالخير دائماً وأبداً.
-          </p>
-          <div className="flex items-center justify-center gap-4 mt-8 text-amber-500/50">
-            <span className="w-16 h-[1px] bg-amber-500/30"></span>
-            <span>✦</span>
-            <span className="w-16 h-[1px] bg-amber-500/30"></span>
-          </div>
-        </footer>
-
-      </div>
+              <SectionContent blocks={section.blocks} />
+            </section>
+          ))}
+        </div>
+        <div
+          aria-hidden="true"
+          className="mt-10 flex items-center justify-center gap-4 text-amber-500/50"
+        >
+          <span className="h-px w-16 bg-amber-500/30" />✦
+          <span className="h-px w-16 bg-amber-500/30" />
+        </div>
+      </main>
     </div>
   );
 }

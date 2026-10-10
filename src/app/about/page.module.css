@@ -1,0 +1,27 @@
+.page {
+  scrollbar-width: thin;
+  scrollbar-color: #78350f #020617;
+  scroll-behavior: smooth;
+  overflow-wrap: break-word;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.page::-webkit-scrollbar {
+  width: 8px;
+}
+
+.page::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+.page::-webkit-scrollbar-thumb {
+  border: 2px solid #020617;
+  border-radius: 6px;
+  background: #78350f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page {
+    scroll-behavior: auto;
+  }
+}
