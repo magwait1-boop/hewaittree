@@ -16,6 +16,8 @@ interface Props {
   onDelete: (id: string) => void;
   onSelectDescendants: (id: string) => void;
   onCenterNode: (id: string) => void;
+  compact?: boolean;
+  titleId?: string;
 }
 
 const BRANCH_COLORS: Record<string, string> = {
@@ -26,7 +28,8 @@ const BRANCH_COLORS: Record<string, string> = {
 
 export default function TreeSidebar({
   nodeId, persons, personMap, childrenMap, currentUser,
-  onClose, onEdit, onAddChild, onDelete, onSelectDescendants, onCenterNode
+  onClose, onEdit, onAddChild, onDelete, onSelectDescendants, onCenterNode,
+  compact = false, titleId,
 }: Props) {
   const person = nodeId ? personMap.get(nodeId) : null;
 
@@ -73,21 +76,21 @@ export default function TreeSidebar({
 
   return (
     <aside
-      className="glass-sidebar w-full h-full flex flex-col scrollbar-thin overflow-y-auto"
+      className="glass-sidebar w-full h-full min-h-0 flex flex-col overflow-hidden"
       style={{ direction: 'rtl' }}>
 
       {/* Header */}
-      <div className="flex items-start justify-between p-4 border-b border-white/10 flex-shrink-0 mt-[54px]">
-        <div className="flex items-center gap-3">
+      <div className={`flex items-start justify-between gap-2 p-4 border-b border-white/10 flex-shrink-0 ${compact ? '' : 'mt-[54px]'}`}>
+        <div className="flex min-w-0 items-center gap-3">
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-black flex-shrink-0"
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-black flex-shrink-0"
             style={{ background: person.leafColor || (person.gender === 'أنثى' ? '#fcd9d9' : '#add7a0'), color: '#0f172a' }}>
 
             {person.name.charAt(0)}
           </div>
-          <div>
-            <h2 className="text-base font-black text-accent leading-tight">{person.name}</h2>
-            <div className="flex items-center gap-2 mt-1">
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-base font-black text-foreground leading-snug break-words">{person.name}</h2>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               {person.branch &&
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full"
@@ -106,14 +109,15 @@ export default function TreeSidebar({
         </div>
         <button
           onClick={onClose}
-          className="text-muted-foreground hover:text-foreground transition-colors p-1 text-lg leading-none"
+          data-details-close
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-foreground hover:bg-white/10 transition-colors text-xl leading-none"
           aria-label="إغلاق">
 
           ✕
         </button>
       </div>
 
-      <div className="flex-1 p-4 space-y-3">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin p-4 space-y-3">
         {/* Info Card */}
         <div className="info-card">
           {[

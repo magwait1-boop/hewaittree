@@ -6,23 +6,17 @@ import type { CurrentUser } from './FamilyTreeClient';
 
 interface Props {
   currentUser: CurrentUser | null;
-  searchQuery: string;
-  searchMatches: string[];
-  searchIndex: number;
   totalPersons?: number;
-  onSearch: (q: string) => void;
-  onNavigateSearch: (dir: 'prev' | 'next') => void;
   onLoginClick: () => void;
   onLogout: () => void;
   onPrint: () => void;
 }
 
 export default function TreeHeader({
-  currentUser, searchQuery, searchMatches, searchIndex,
+  currentUser,
   totalPersons,
-  onSearch, onNavigateSearch, onLoginClick, onLogout, onPrint
+  onLoginClick, onLogout, onPrint
 }: Props) {
-  const inputRef = React.useRef<HTMLInputElement>(null);
   const count = totalPersons ?? 0;
 
   return (
@@ -55,63 +49,29 @@ export default function TreeHeader({
       </div>
 
       <header
-        className="glass-panel no-print absolute top-0 left-0 right-0 z-30 h-14 flex items-center px-4 gap-3 border-b-0"
+        className="glass-panel no-print absolute top-0 left-0 right-0 z-30 h-14 flex items-center px-3 sm:px-4 gap-2 sm:gap-3 border-b-0"
         style={{ direction: 'rtl' }}>
 
         {/* Logo + Title + Info Badge */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <AppLogo size={32} />
-          <div className="hidden sm:block">
-            <span className="font-sans font-black text-sm md:text-base text-foreground leading-tight block">
+          <div className="min-w-0">
+            <span className="font-sans font-black text-xs sm:text-sm md:text-base text-foreground leading-tight block truncate">
               شجرة عائلة آل حويت
             </span>
-            <span className="text-xs font-medium text-muted-foreground leading-tight block">
+            <span className="text-xs font-medium text-muted-foreground leading-tight hidden sm:block">
               كفر هلال 🌳 — {count.toLocaleString('ar-EG')} فرد
             </span>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="flex-1 flex items-center gap-2 max-w-xl mx-auto">
-          <div className="relative flex-1">
-            <input
-              ref={inputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearch(e.target.value)}
-              onKeyDown={(e) => {if (e.key === 'Enter') onSearch(searchQuery);}}
-              placeholder="ابحث بالاسم واضغط Enter..."
-              className="custom-input pr-4 pl-4 h-9 text-sm w-full"
-              style={{ direction: 'rtl' }} />
-          </div>
-          {searchMatches.length > 0 &&
-          <div className="search-nav-bar flex-shrink-0">
-              <button
-              onClick={() => onNavigateSearch('prev')}
-              className="hover:opacity-70 transition-opacity px-1"
-              aria-label="نتيجة سابقة">
-                ▶
-              </button>
-              <span className="tabular-nums text-xs font-black">
-                {searchIndex + 1}/{searchMatches.length}
-              </span>
-              <button
-              onClick={() => onNavigateSearch('next')}
-              className="hover:opacity-70 transition-opacity px-1"
-              aria-label="نتيجة تالية">
-                ◀
-              </button>
-            </div>
-          }
-        </div>
-
         {/* User status */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Link href="/about" className="btn-base text-xs px-3 py-1.5 no-print inline-flex items-center gap-1">
-            ℹ️ <span>من نحن</span>
+          <Link href="/about" aria-label="من نحن" className="btn-base text-xs px-2 sm:px-3 py-1.5 no-print inline-flex items-center gap-1">
+            ℹ️ <span className="hidden sm:inline">من نحن</span>
           </Link>
-          <button onClick={onPrint} className="btn-base text-xs px-3 py-1.5 no-print flex items-center gap-1">
-            🖨️ <span>طباعه</span>
+          <button onClick={onPrint} aria-label="طباعة الشجرة" className="btn-base text-xs px-2 sm:px-3 py-1.5 no-print flex items-center gap-1">
+            🖨️ <span className="hidden sm:inline">طباعة</span>
           </button>
           {currentUser ?
           <>
@@ -121,9 +81,11 @@ export default function TreeHeader({
                   {currentUser.role === 'admin' ? 'مسؤول' : 'مشرف'}
                 </span>
               </span>
-              <Link href="/moderation-screen" className="btn-base text-xs px-3 py-1.5 hidden sm:inline-flex items-center gap-1">
-                🛡️ المراجعة
-              </Link>
+              <span className="hidden sm:block">
+                <Link href="/moderation-screen" className="btn-base text-xs px-3 py-1.5 inline-flex items-center gap-1">
+                  🛡️ المراجعة
+                </Link>
+              </span>
               <button onClick={onLogout} className="btn-base btn-danger text-xs px-3 py-1.5">
                 خروج
               </button>

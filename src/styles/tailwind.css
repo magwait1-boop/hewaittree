@@ -444,6 +444,85 @@
     overflow: hidden;
     cursor: grab;
   }
+  .family-tree {
+    --tree-controls-height: 164px;
+    height: 100dvh;
+  }
+  .tree-search-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+  }
+  .search-step-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    color: #a7f3d0;
+    transition: background-color 0.15s;
+  }
+  .search-step-button:hover:not(:disabled) {
+    background: rgba(16, 185, 129, 0.15);
+  }
+  .search-step-button:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .tree-toolbar-action {
+    width: 40px;
+    height: 44px;
+    flex-shrink: 0;
+    padding: 0;
+    justify-content: center;
+    border-radius: 12px;
+  }
+  @media (min-width: 1024px) {
+    .tree-toolbar-action {
+      width: auto;
+      padding: 8px 12px;
+    }
+  }
+  .person-details-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    height: 55vh;
+    height: 55dvh;
+    max-height: calc(100% - var(--tree-controls-height) - 16px);
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 0;
+    border-radius: 24px 24px 0 0;
+    background: #0f172a;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.25);
+    animation: personDetailsEnter 0.2s ease-out;
+  }
+  @keyframes personDetailsEnter {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (min-width: 640px) {
+    .family-tree {
+      --tree-controls-height: 104px;
+    }
+    .person-details-sheet {
+      top: var(--tree-controls-height);
+      left: auto;
+      width: var(--sidebar-width);
+      height: auto;
+      max-height: none;
+      border-radius: 20px 0 0 0;
+      animation: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .person-details-sheet { animation: none; }
+  }
   .tree-canvas-wrap:active {
     cursor: grabbing;
   }

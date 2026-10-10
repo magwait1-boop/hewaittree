@@ -19,7 +19,7 @@ import {
 } from '@/lib/famRequestService';
 
 import TreeToolbar from './TreeToolbar';
-import TreeSidebar from './TreeSidebar';
+import PersonDetailsModal from './PersonDetailsModal';
 import ZoomControls from './ZoomControls';
 import NodeModal from './NodeModal';
 import EdgeStyleModal from './EdgeStyleModal';
@@ -133,6 +133,15 @@ export default function FamilyTreeClient() {
   const nameIndex = useMemo(() => buildNameIndex(persons), [persons]);
   const dragSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialFitDone = useRef(false);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const getCanvasSize = useCallback(() => {
+    const rect = canvasContainerRef.current?.getBoundingClientRect();
+    return { w: Math.max(0, rect?.width ?? 1440), h: Math.max(0, rect?.height ?? 800) };
+  }, []);
+  const closePersonDetails = useCallback(() => {
+    setIsSidebarOpen(false);
+    setSidebarNodeId(null);
+  }, []);
   // إضافة المؤشر لحماية السحب من تداخل السيرفر
   const isDraggingActiveRef = useRef(false);
 
@@ -357,27 +366,30 @@ export default function FamilyTreeClient() {
     const ys = persons.map(p => p.manualY);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const W = Math.max(0, typeof window !== 'undefined' ? window.innerWidth : 1440);
-    const H = Math.max(0, typeof window !== 'undefined' ? window.innerHeight - 120 : 800);
+    const { w: W, h: H } = getCanvasSize();
     const scaleX = Math.max(0, W - 100) / (Math.max(0, maxX - minX) || 1);
     const scaleY = Math.max(0, H - 100) / (Math.max(0, maxY - minY) || 1);
     const s = Math.min(scaleX, scaleY, 0.5);
     const midX = (minX + maxX) / 2;
     const midY = (minY + maxY) / 2;
     setSafeView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
-  }, [persons, setSafeView]);
+  }, [persons, setSafeView, getCanvasSize]);
 
-  const centerOnNode = useCallback((id: string) => {
+  const centerOnNode = useCallback((id: string, showDetails = false) => {
     const p = personMap.get(id);
     if (!p) return;
-    const W = Math.max(0, typeof window !== 'undefined' ? window.innerWidth : 1440);
-    const H = Math.max(0, typeof window !== 'undefined' ? window.innerHeight - 120 : 800);
+    const { w, h } = getCanvasSize();
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    // Keep a tapped node in the part of the tree left visible by its details.
+    const W = Math.max(0, w - (showDetails && !isMobile ? 360 : 0));
+    const H = Math.max(0, h - (showDetails && isMobile ? window.innerHeight * 0.55 : 0));
     const s = 1.3;
     setSafeView({ x: W / 2 - p.manualX * s, y: H / 2 - p.manualY * s, scale: s });
-  }, [personMap, setSafeView]);
+  }, [personMap, setSafeView, getCanvasSize]);
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
+    closePersonDetails();
     if (!query.trim()) {
       setSearchMatches([]);
       setSearchIndex(0);
@@ -388,12 +400,8 @@ export default function FamilyTreeClient() {
     setSearchIndex(0);
     if (matches.length > 0) {
       centerOnNode(matches[0]);
-      setSidebarNodeId(matches[0]);
-      setIsSidebarOpen(true);
-    } else {
-      toast.error('لا توجد نتائج للبحث');
     }
-  }, [persons, nameIndex, centerOnNode]);
+  }, [persons, nameIndex, centerOnNode, closePersonDetails]);
 
   const navigateSearch = useCallback((dir: 'prev' | 'next') => {
     if (searchMatches.length === 0) return;
@@ -401,15 +409,16 @@ export default function FamilyTreeClient() {
       ? (searchIndex + 1) % searchMatches.length
       : (searchIndex - 1 + searchMatches.length) % searchMatches.length;
     setSearchIndex(newIdx);
+    closePersonDetails();
     centerOnNode(searchMatches[newIdx]);
-    setSidebarNodeId(searchMatches[newIdx]);
-    setIsSidebarOpen(true);
-  }, [searchMatches, searchIndex, centerOnNode]);
+  }, [searchMatches, searchIndex, centerOnNode, closePersonDetails]);
 
   const handleNodeClick = useCallback((id: string) => {
+    if (!personMap.has(id)) return;
     setSidebarNodeId(id);
     setIsSidebarOpen(true);
-  }, []);
+    centerOnNode(id, true);
+  }, [personMap, centerOnNode]);
 
   const handleNodeDblClick = useCallback((id: string) => {
     if (!currentUser) return;
@@ -431,13 +440,12 @@ export default function FamilyTreeClient() {
     const ys = persons.map(p => p.manualY);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const W = Math.max(0, typeof window !== 'undefined' ? window.innerWidth : 1440);
-    const H = Math.max(0, typeof window !== 'undefined' ? window.innerHeight - 120 : 800);
+    const { w: W, h: H } = getCanvasSize();
     const s = Math.min(Math.max(0, W - 100) / (Math.max(0, maxX - minX) || 1), Math.max(0, H - 100) / (Math.max(0, maxY - minY) || 1), 0.5);
     const midX = (minX + maxX) / 2;
     const midY = (minY + maxY) / 2;
     setSafeView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
-  }, [persons, setSafeView]);
+  }, [persons, setSafeView, getCanvasSize]);
 
   const handleLogin = useCallback((username: string, password: string): boolean => {
     const user = SYSTEM_USERS[username];
@@ -767,7 +775,7 @@ export default function FamilyTreeClient() {
   }, [currentUser, persons]);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden" style={{ direction: 'rtl' }}>
+    <div className="family-tree relative w-screen h-screen overflow-hidden" style={{ direction: 'rtl' }}>
       {/* Background canvas style */}
       <div className={`absolute inset-0 ${
         settings.bgStyle === 'bg-grid' ? 'bg-grid-canvas' :
@@ -786,15 +794,10 @@ export default function FamilyTreeClient() {
           </div>
         </div>
       )}
-           {/* Top Header with Logo, Title, and Search Bar */}
+      {/* Top Header */}
       <TreeHeader
         currentUser={currentUser}
-        searchQuery={searchQuery}
-        searchMatches={searchMatches}
-        searchIndex={searchIndex}
         totalPersons={persons.length}
-        onSearch={handleSearch}
-        onNavigateSearch={navigateSearch}
         onLoginClick={() => setShowAuthModal(true)}
         onLogout={handleLogout}
         onPrint={handlePrint}
@@ -805,6 +808,11 @@ export default function FamilyTreeClient() {
         persons={persons}
         currentUser={currentUser}
         pendingCount={pendingRequests.length}
+        searchQuery={searchQuery}
+        searchMatches={searchMatches}
+        searchIndex={searchIndex}
+        onSearch={handleSearch}
+        onNavigateSearch={navigateSearch}
         onAddPerson={() => openAddPerson()}
         onOpenAdmin={() => setShowAdminModal(true)}
         onImport={handleImport}
@@ -816,8 +824,9 @@ export default function FamilyTreeClient() {
 
       {/* Tree Canvas */}
       <div
-        className="absolute inset-0 pt-[112px] tree-canvas-wrap touch-none"
-        style={{ touchAction: 'none', overscrollBehavior: 'none' }}
+        ref={canvasContainerRef}
+        className="absolute inset-0 tree-canvas-wrap touch-none"
+        style={{ top: 'var(--tree-controls-height)', touchAction: 'none', overscrollBehavior: 'none' }}
       >
         <CanvasErrorBoundary key={canvasRecoveryKey} onError={recoverCanvas}>
           <TreeCanvas
@@ -838,8 +847,7 @@ export default function FamilyTreeClient() {
             childrenMap={childrenMap}
             onBgClick={() => {
               setSelectedIds(new Set());
-              setSidebarNodeId(null);
-              setIsSidebarOpen(false);
+              closePersonDetails();
             }}
             isPrinting={isPrinting}
             onPrintDone={() => setIsPrinting(false)}
@@ -847,25 +855,24 @@ export default function FamilyTreeClient() {
         </CanvasErrorBoundary>
       </div>
 
-      {/* Sidebar */}
-      <div className={`sidebar-wrap ${isSidebarOpen && sidebarNodeId ? 'open' : ''}`}>
-        <TreeSidebar
-          nodeId={sidebarNodeId}
-          persons={persons}
-          personMap={personMap}
-          childrenMap={childrenMap}
-          currentUser={currentUser}
-          onClose={() => { setIsSidebarOpen(false); setSidebarNodeId(null); }}
-          onEdit={(id) => {
-            const p = personMap.get(id);
-            if (p) { setEditingPerson(p); setShowNodeModal(true); }
-          }}
-          onAddChild={(parentId) => openAddPerson(parentId)}
-          onDelete={handleDeletePerson}
-          onSelectDescendants={handleSelectDescendants}
-          onCenterNode={centerOnNode}
-        />
-      </div>
+      {/* Details open only after a node tap or click. */}
+      <PersonDetailsModal
+        isOpen={isSidebarOpen}
+        nodeId={sidebarNodeId}
+        persons={persons}
+        personMap={personMap}
+        childrenMap={childrenMap}
+        currentUser={currentUser}
+        onClose={closePersonDetails}
+        onEdit={(id) => {
+          const p = personMap.get(id);
+          if (p) { closePersonDetails(); setEditingPerson(p); setShowNodeModal(true); }
+        }}
+        onAddChild={(parentId) => { closePersonDetails(); openAddPerson(parentId); }}
+        onDelete={handleDeletePerson}
+        onSelectDescendants={handleSelectDescendants}
+        onCenterNode={id => { closePersonDetails(); centerOnNode(id); }}
+      />
 
       {/* Zoom Controls */}
       <ZoomControls zoom={view.scale} onZoomChange={handleZoomChange} onFit={handleFitToView} />

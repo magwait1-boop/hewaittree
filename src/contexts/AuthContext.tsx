@@ -1,10 +1,28 @@
 
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import type { AuthResponse, AuthTokenResponsePassword, Session, User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 
-const AuthContext = createContext<any>({});
+interface SignUpMetadata {
+  fullName?: string;
+  avatarUrl?: string;
+}
+
+interface AuthContextValue {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  signUp: (email: string, password: string, metadata?: SignUpMetadata) => Promise<AuthResponse['data']>;
+  signIn: (email: string, password: string) => Promise<AuthTokenResponsePassword['data']>;
+  signOut: () => Promise<void>;
+  getCurrentUser: () => Promise<User | null>;
+  isEmailVerified: () => boolean;
+  getUserProfile: () => Promise<Record<string, unknown> | null>;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -14,11 +32,11 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<any>(null);
-  const [session, setSession] = useState<any>(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const [supabase] = useState(createClient);
 
   useEffect(() => {
     // Get initial session
@@ -38,10 +56,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   // Email/Password Sign Up
-  const signUp = async (email: string, password: string, metadata = {}) => {
+  const signUp = async (email: string, password: string, metadata: SignUpMetadata = {}) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -82,7 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Check if Email is Verified
   const isEmailVerified = () => {
-    return user?.email_confirmed_at !== null;
+    return Boolean(user?.email_confirmed_at);
   };
 
   // Get User Profile from Database
@@ -92,12 +110,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .from('user_profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .single<Record<string, unknown>>();
     if (error) throw error;
     return data;
   };
 
-  const value = {
+  const value: AuthContextValue = {
     user,
     session,
     loading,

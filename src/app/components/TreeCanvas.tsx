@@ -116,13 +116,16 @@ export default function TreeCanvas({
   useEffect(() => { onPrintDoneRef.current = onPrintDone; }, [onPrintDone]);
 
   useEffect(() => {
+    const container = svgRef.current?.parentElement;
     const update = () => setCanvasSize({
-      w: Math.max(0, window.innerWidth),
-      h: Math.max(0, window.innerHeight - 112),
+      w: Math.max(0, container?.clientWidth ?? window.innerWidth),
+      h: Math.max(0, container?.clientHeight ?? window.innerHeight - 112),
     });
     update();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    if (container) observer?.observe(container);
     window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', update); };
   }, []);
 
   // Virtual rendering — only draw nodes in viewport + padding
@@ -620,8 +623,8 @@ export default function TreeCanvas({
             if (p.cardBorderColor) strokeColor = p.cardBorderColor;
             if (p.cardBorderWidth !== undefined) strokeWidth = p.cardBorderWidth / view.scale;
 
-            if (isRoot) { strokeColor = p.cardBorderColor || '#e1d019'; strokeWidth = (p.cardBorderWidth ?? 3) / view.scale; filterAttr = 'url(#glow-root)'; }
-            else if (isHighlighted) { strokeColor = '#fbbf24'; strokeWidth = 4 / view.scale; filterAttr = 'url(#glow-highlight)'; }
+            if (isHighlighted) { strokeColor = '#fbbf24'; strokeWidth = 4 / view.scale; filterAttr = 'url(#glow-highlight)'; }
+            else if (isRoot) { strokeColor = p.cardBorderColor || '#e1d019'; strokeWidth = (p.cardBorderWidth ?? 3) / view.scale; filterAttr = 'url(#glow-root)'; }
             else if (isDescendant) { strokeColor = '#c084fc'; strokeWidth = 4 / view.scale; filterAttr = 'url(#glow-descendant)'; }
             else if (isSelected) { strokeColor = '#38bdf8'; strokeWidth = 3 / view.scale; filterAttr = 'url(#glow-selected)'; }
 
