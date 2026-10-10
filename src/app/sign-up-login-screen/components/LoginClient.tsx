@@ -3,7 +3,7 @@ import React, { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import { SYSTEM_USERS } from '@/lib/familyData';
+import { useFamilySession } from '@/contexts/FamilySessionContext';
 import { Toaster, toast } from 'sonner';
 
 interface FormData { username: string; password: string; }
@@ -24,20 +24,21 @@ const STATS = [
 
 export default function LoginClient() {
   const router = useRouter();
+  const { signIn } = useFamilySession();
   const [showPass, setShowPass] = useState(false);
   const [loginError, setLoginError] = useState('');
   const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>();
 
-  const onSubmit = useCallback((data: FormData) => {
-    const user = SYSTEM_USERS[data.username];
-    if (user && user.pass === data.password) {
-      localStorage.setItem('fam_current_user', JSON.stringify({ username: data.username, role: user.role }));
+  const onSubmit = useCallback(async (data: FormData) => {
+    setLoginError('');
+    try {
+      await signIn(data.username, data.password);
       toast.success(`مرحباً ${data.username}`);
       setTimeout(() => router.push('/'), 800);
-    } else {
-      setLoginError('بيانات الدخول غير صحيحة — استخدم أحد الحسابات التجريبية أدناه للدخول');
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : 'تعذر تسجيل الدخول');
     }
-  }, [router]);
+  }, [router, signIn]);
 
   const autofill = useCallback((username: string, password: string) => {
     setValue('username', username);

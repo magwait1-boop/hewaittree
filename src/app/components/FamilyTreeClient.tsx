@@ -1,7 +1,9 @@
 'use client';
 import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { MOCK_PERSONS, DEFAULT_SETTINGS, LOCAL_SETTINGS_PENDING_KEY, SYSTEM_USERS, buildChildrenMap, buildPersonMap, buildNameIndex, searchPersons, normalizeSettings, type Person, type PendingRequest, type AppSettings,  } from '@/lib/familyData';
+import { MOCK_PERSONS, DEFAULT_SETTINGS, LOCAL_SETTINGS_PENDING_KEY, buildChildrenMap, buildPersonMap, buildNameIndex, searchPersons, normalizeSettings, type Person, type PendingRequest, type AppSettings,  } from '@/lib/familyData';
+import { useFamilySession } from '@/contexts/FamilySessionContext';
+export type { CurrentUser } from '@/lib/familyPermissions';
 import {
   fetchAllPersons,
   upsertPerson,
@@ -79,11 +81,6 @@ class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, CanvasErro
   }
 }
 
-export interface CurrentUser {
-  username: string;
-  role: 'admin' | 'supervisor';
-}
-
 export default function FamilyTreeClient() {
   const [persons, setPersons] = useState<Person[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -100,7 +97,7 @@ export default function FamilyTreeClient() {
       setCanvasRecoveryKey(key => key + 1);
     }
   }, [setSafeView]);
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const { currentUser, permissions, signIn, signOut } = useFamilySession();
   const [sidebarNodeId, setSidebarNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatches, setSearchMatches] = useState<string[]>([]);
@@ -285,11 +282,6 @@ export default function FamilyTreeClient() {
     }
 
     loadData();
-
-    const savedUser = localStorage.getItem('fam_current_user');
-    if (savedUser) {
-      try { setCurrentUser(JSON.parse(savedUser)); } catch {}
-    }
   }, []);
 
   // Re-apply settings whenever the page becomes visible again
@@ -421,13 +413,13 @@ export default function FamilyTreeClient() {
   }, [personMap, centerOnNode]);
 
   const handleNodeDblClick = useCallback((id: string) => {
-    if (!currentUser) return;
+    if (!permissions.can_edit) return;
     const p = personMap.get(id);
     if (!p) return;
     setEditingPerson(p);
     setNodeModalParentId('');
     setShowNodeModal(true);
-  }, [currentUser, personMap]);
+  }, [permissions.can_edit, personMap]);
 
   const handleZoomChange = useCallback((zoom: number) => {
     if (!Number.isFinite(zoom)) return;
@@ -447,25 +439,18 @@ export default function FamilyTreeClient() {
     setSafeView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
   }, [persons, setSafeView, getCanvasSize]);
 
-  const handleLogin = useCallback((username: string, password: string): boolean => {
-    const user = SYSTEM_USERS[username];
-    if (user && user.pass === password) {
-      const u: CurrentUser = { username, role: user.role };
-      setCurrentUser(u);
-      localStorage.setItem('fam_current_user', JSON.stringify(u));
-      toast.success(`مرحباً ${username} — صلاحية: ${user.role === 'admin' ? 'مسؤول' : 'مشرف'}`);
-      return true;
-    }
-    return false;
-  }, []);
+  const handleLogin = useCallback(async (username: string, password: string) => {
+    await signIn(username, password);
+    toast.success(`مرحباً ${username}`);
+  }, [signIn]);
 
   const handleLogout = useCallback(() => {
-    setCurrentUser(null);
-    localStorage.removeItem('fam_current_user');
+    signOut();
     toast.success('تم تسجيل الخروج');
-  }, []);
+  }, [signOut]);
 
   const handleSavePerson = useCallback(async (data: Person) => {
+    if (!permissions.can_edit) return;
     if (currentUser?.role === 'admin') {
       // Optimistic UI update immediately
       setPersons(prev => {
@@ -509,9 +494,10 @@ export default function FamilyTreeClient() {
     }
     setShowNodeModal(false);
     setEditingPerson(null);
-  }, [currentUser]);
+  }, [currentUser, permissions.can_edit]);
 
   const handleDeletePerson = useCallback(async (id: string) => {
+    if (!permissions.can_delete) return;
     if (currentUser?.role === 'admin') {
       setPersons(prev => {
         let updated = prev
@@ -546,11 +532,19 @@ export default function FamilyTreeClient() {
         toast.warning('تم حفظ طلب الحذف محلياً — تعذّر الإرسال للمسؤول');
       }
     }
-  }, [currentUser]);
+  }, [currentUser, permissions.can_delete]);
 
   const handleApproveRequest = useCallback(async (reqId: string) => {
+    if (!permissions.can_moderate) return;
     const req = pendingRequests.find(r => r.reqId === reqId);
     if (!req) return;
+    const applied = req.type === 'delete'
+      ? !!req.targetId && await deletePersonFromDB(req.targetId)
+      : !!req.data && await upsertPerson(req.data);
+    if (!applied || !await updateRequestStatus(reqId, 'approved')) {
+      toast.error('تعذر اعتماد الطلب، حاول مرة أخرى');
+      return;
+    }
     if (req.type === 'add' || req.type === 'edit') {
       if (req.data) {
         setPersons(prev => {
@@ -565,7 +559,6 @@ export default function FamilyTreeClient() {
           window.dispatchEvent(new Event('fam_nodes_changed'));
           return updated;
         });
-        await upsertPerson(req.data);
       }
     } else if (req.type === 'delete' && req.targetId) {
       setPersons(prev => {
@@ -576,23 +569,23 @@ export default function FamilyTreeClient() {
         window.dispatchEvent(new Event('fam_nodes_changed'));
         return updated;
       });
-      await deletePersonFromDB(req.targetId);
     }
-    // Update status in Supabase and remove from local state
-    await updateRequestStatus(reqId, 'approved');
     setPendingRequests(prev => prev.filter(r => r.reqId !== reqId));
     toast.success('تم اعتماد الطلب');
-  }, [pendingRequests]);
+  }, [pendingRequests, permissions.can_moderate]);
 
   const handleRejectRequest = useCallback(async (reqId: string) => {
-    await updateRequestStatus(reqId, 'rejected');
+    if (!permissions.can_moderate) return;
+    if (!await updateRequestStatus(reqId, 'rejected')) {
+      toast.error('تعذر رفض الطلب');
+      return;
+    }
     setPendingRequests(prev => prev.filter(r => r.reqId !== reqId));
     toast.error('تم رفض الطلب');
-  }, []);
+  }, [permissions.can_moderate]);
 
   const handleNodeDrag = useCallback((id: string, dx: number, dy: number) => {
-    // التأكد إن المستخدم أدمن
-    if (currentUser?.role !== 'admin') return;
+    if (!permissions.can_style) return;
 
     // 1. تشغيل حماية السحب (عشان السيرفر ما يتدخلش ويرجع الكارت مكانه)
     isDraggingActiveRef.current = true;
@@ -638,9 +631,10 @@ export default function FamilyTreeClient() {
 
       return updated;
     });
-  }, [currentUser, selectedIds]);
+  }, [permissions.can_style, selectedIds]);
 
   const handleImport = useCallback(async (data: Person[], merge: boolean) => {
+    if (currentUser?.role !== 'admin') return;
     const total = data.length;
     const toastId = toast.loading(`جارٍ استيراد ${total.toLocaleString('ar-EG')} شخص — الدُفعة 1...`);
 
@@ -697,7 +691,7 @@ export default function FamilyTreeClient() {
       }
       toast.error(`تم الاستيراد محلياً (${total.toLocaleString('ar-EG')} شخص) — تعذّر الحفظ في قاعدة البيانات`);
     }
-  }, []);
+  }, [currentUser]);
 
   const handleExportCSV = useCallback(() => {
     const headers = 'id,name,gender,fatherId,branch,birthDate,deathDate,notes,leafColor,nodeScale,manualX,manualY';
@@ -727,12 +721,14 @@ export default function FamilyTreeClient() {
   }, []);
 
   const openAddPerson = useCallback((parentId = '') => {
+    if (!permissions.can_edit) return;
     setEditingPerson(null);
     setNodeModalParentId(parentId);
     setShowNodeModal(true);
-  }, []);
+  }, [permissions.can_edit]);
 
   const handleSelectDescendants = useCallback((id: string) => {
+    if (!permissions.can_style) return;
     const collect = (nodeId: string, acc: Set<string>) => {
       acc.add(nodeId);
       const children = childrenMapRef.current.get(nodeId) ?? [];
@@ -741,7 +737,7 @@ export default function FamilyTreeClient() {
     const ids = new Set<string>();
     collect(id, ids);
     setSelectedIds(ids);
-  }, []);
+  }, [permissions.can_style]);
 
   const handleSaveEdgeStyle = useCallback(async (
     childId: string,
@@ -749,7 +745,7 @@ export default function FamilyTreeClient() {
     width: number,
     applyToDescendants: boolean,
   ) => {
-    if (currentUser?.role !== 'admin') return;
+    if (!permissions.can_style) return;
     const affectedIds = new Set<string>();
     const collect = (personId: string) => {
       if (affectedIds.has(personId)) return;
@@ -772,7 +768,7 @@ export default function FamilyTreeClient() {
     const results = await Promise.all(affectedPersons.map(upsertPerson));
     if (results.every(Boolean)) toast.success('تم حفظ تنسيق خطوط الاتصال بنجاح');
     else toast.error('تم تطبيق التنسيق محلياً، وتعذّر حفظ بعض التعديلات في قاعدة البيانات');
-  }, [currentUser, persons]);
+  }, [permissions.can_style, persons]);
 
   return (
     <div className="family-tree relative w-screen h-screen overflow-hidden" style={{ direction: 'rtl' }}>
@@ -841,8 +837,8 @@ export default function FamilyTreeClient() {
             onNodeDblClick={handleNodeDblClick}
             onNodeDrag={handleNodeDrag}
             onEdgeClick={setEdgeStylePersonId}
-            canEditEdges={currentUser?.role === 'admin'}
-            canDrag={currentUser?.role === 'admin'}
+            canEditEdges={permissions.can_style}
+            canDrag={permissions.can_style}
             personMap={personMap}
             childrenMap={childrenMap}
             onBgClick={() => {
@@ -865,6 +861,7 @@ export default function FamilyTreeClient() {
         currentUser={currentUser}
         onClose={closePersonDetails}
         onEdit={(id) => {
+          if (!permissions.can_edit) return;
           const p = personMap.get(id);
           if (p) { closePersonDetails(); setEditingPerson(p); setShowNodeModal(true); }
         }}
@@ -884,7 +881,7 @@ export default function FamilyTreeClient() {
           onClose={() => setShowAuthModal(false)}
         />
       )}
-      {showNodeModal && (
+      {showNodeModal && permissions.can_edit && (
         <NodeModal
           editing={editingPerson}
           parentId={nodeModalParentId}
@@ -895,7 +892,7 @@ export default function FamilyTreeClient() {
           onClose={() => { setShowNodeModal(false); setEditingPerson(null); }}
         />
       )}
-      {edgeStylePersonId && currentUser?.role === 'admin' && personMap.get(edgeStylePersonId) && (
+      {edgeStylePersonId && permissions.can_style && personMap.get(edgeStylePersonId) && (
         <EdgeStyleModal
           person={personMap.get(edgeStylePersonId)!}
           onSave={(color, width, applyToDescendants) =>
@@ -904,7 +901,7 @@ export default function FamilyTreeClient() {
           onClose={() => setEdgeStylePersonId(null)}
         />
       )}
-      {showAdminModal && currentUser?.role === 'admin' && (
+      {showAdminModal && permissions.can_moderate && (
         <AdminModal
           requests={pendingRequests}
           personMap={personMap}

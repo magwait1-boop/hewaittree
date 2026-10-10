@@ -1,7 +1,8 @@
 'use client';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import type { Person } from '@/lib/familyData';
+import { useFamilySession } from '@/contexts/FamilySessionContext';
 
 interface Props {
   onReset: () => void;
@@ -12,6 +13,9 @@ interface Props {
 }
 
 export default function DataManagementPanel({ onReset, onImport, onExportCSV, onExportJSON, isAdmin }: Props) {
+  const { permissions, signOut } = useFamilySession();
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => { setIsMounted(true); }, []);
   const [backupSize, setBackupSize] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,6 +38,7 @@ export default function DataManagementPanel({ onReset, onImport, onExportCSV, on
   };
 
   const clearRequests = () => {
+    if (!permissions.can_moderate) return;
     if (window.confirm('هل تريد حذف جميع الطلبات المعلقة المحلية؟')) {
       localStorage.removeItem('fam_requests');
       toast.success('تم حذف الطلبات المحلية');
@@ -41,7 +46,7 @@ export default function DataManagementPanel({ onReset, onImport, onExportCSV, on
   };
 
   const clearSession = () => {
-    localStorage.removeItem('fam_current_user');
+    signOut();
     toast.success('تم تسجيل الخروج من الجلسة');
   };
 
@@ -209,7 +214,7 @@ export default function DataManagementPanel({ onReset, onImport, onExportCSV, on
         <span className="settings-label">التخزين المحلي (ذاكرة تخزين مؤقت)</span>
         <div className="space-y-2 mt-2">
           {storageItems.map(item => {
-            const value = typeof window !== 'undefined' ? localStorage.getItem(item.key) : null;
+            const value = isMounted ? localStorage.getItem(item.key) : null;
             const hasData = value !== null;
             const size = hasData ? `${(new Blob([value!]).size / 1024).toFixed(1)} KB` : null;
             return (
@@ -247,9 +252,9 @@ export default function DataManagementPanel({ onReset, onImport, onExportCSV, on
           <button onClick={clearBackup} className="btn-base btn-danger justify-center text-sm">
             🗑 حذف النسخة المحلية
           </button>
-          <button onClick={clearRequests} className="btn-base justify-center text-sm">
+          {permissions.can_moderate && <button onClick={clearRequests} className="btn-base justify-center text-sm">
             🗂 مسح الطلبات المعلقة
-          </button>
+          </button>}
           <button onClick={clearSession} className="btn-base justify-center text-sm">
             🚪 إنهاء الجلسة الحالية
           </button>
@@ -281,7 +286,7 @@ export default function DataManagementPanel({ onReset, onImport, onExportCSV, on
       </div>
 
       {/* Danger Zone */}
-      <div className="settings-section" style={{ borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
+      {permissions.can_style && <div className="settings-section" style={{ borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
         <span className="settings-label" style={{ color: '#ef4444' }}>منطقة الخطر</span>
         <p className="text-xs text-muted-foreground mb-3">
           هذه الإجراءات لا يمكن التراجع عنها — تأكد قبل المتابعة
@@ -292,7 +297,7 @@ export default function DataManagementPanel({ onReset, onImport, onExportCSV, on
         >
           ⚠ إعادة ضبط جميع الإعدادات للقيم الافتراضية
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

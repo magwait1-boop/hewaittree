@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   MOCK_PERSONS,
@@ -7,11 +7,10 @@ import {
   type Person, type PendingRequest,
 } from '@/lib/familyData';
 import AppLogo from '@/components/ui/AppLogo';
-
-interface CurrentUser {
-  username: string;
-  role: 'admin' | 'supervisor';
-}
+import { useFamilySession } from '@/contexts/FamilySessionContext';
+import { fetchAllPersons, upsertPerson, deletePerson } from '@/lib/famNodeService';
+import { fetchPendingRequests, updateRequestStatus } from '@/lib/famRequestService';
+import { createClient } from '@/lib/supabase/client';
 
 const TYPE_LABELS: Record<string, string> = { add: 'إضافة', edit: 'تعديل', delete: 'حذف' };
 const TYPE_COLORS: Record<string, string> = { add: '#10b981', edit: '#f59e0b', delete: '#ef4444' };
@@ -20,7 +19,8 @@ const TYPE_ICONS: Record<string, string> = { add: '➕', edit: '✏️', delete:
 type FilterType = 'all' | 'add' | 'edit' | 'delete';
 
 export default function ModerationClient() {
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const { currentUser, permissions } = useFamilySession();
+  const canReview = permissions.can_moderate;
   const [persons, setPersons] = useState<Person[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
@@ -29,35 +29,34 @@ export default function ModerationClient() {
   const [confirmAction, setConfirmAction] = useState<{ reqId: string; action: 'approve' | 'reject' } | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
 
-  const loadData = () => {
+  const loadData = useCallback(async () => {
+    if (!canReview) return;
     const backup = localStorage.getItem('fam_nodes_backup');
-    setPersons(backup ? JSON.parse(backup) : MOCK_PERSONS);
-    const savedRequests = localStorage.getItem('fam_requests');
-    if (savedRequests) {
-      try { setPendingRequests(JSON.parse(savedRequests)); } catch {}
-    } else {
-      setPendingRequests([]);
-    }
+    try { setPersons(backup ? JSON.parse(backup) : MOCK_PERSONS); } catch { setPersons(MOCK_PERSONS); }
+    const [remotePersons, requests] = await Promise.all([fetchAllPersons(), fetchPendingRequests()]);
+    if (remotePersons) setPersons(remotePersons);
+    setPendingRequests(requests);
     setLastUpdated(Date.now());
-  };
+  }, [canReview]);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('fam_current_user');
-    if (savedUser) {
-      try { setCurrentUser(JSON.parse(savedUser)); } catch {}
-    }
-    loadData();
+    if (!canReview) return;
+    void loadData();
 
     // Cross-tab real-time listener (storage event fires in OTHER tabs)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'fam_requests' || e.key === 'fam_nodes_backup') {
-        loadData();
+        void loadData();
       }
     };
 
     // Same-tab real-time listener (custom events dispatched by other components)
-    const handleRequestsChanged = () => loadData();
-    const handleNodesChanged = () => loadData();
+    const handleRequestsChanged = () => { void loadData(); };
+    const handleNodesChanged = () => { void loadData(); };
+    const supabase = createClient();
+    const channel = supabase.channel('moderation-requests')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fam_requests' }, handleRequestsChanged)
+      .subscribe();
 
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('fam_requests_changed', handleRequestsChanged);
@@ -67,8 +66,9 @@ export default function ModerationClient() {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('fam_requests_changed', handleRequestsChanged);
       window.removeEventListener('fam_nodes_changed', handleNodesChanged);
+      void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [canReview, loadData]);
 
   const personMap = useMemo(() => buildPersonMap(persons), [persons]);
 
@@ -77,9 +77,17 @@ export default function ModerationClient() {
     setTimeout(() => setToastMsg(null), 3000);
   };
 
-  const handleApprove = (reqId: string) => {
+  const handleApprove = async (reqId: string): Promise<boolean> => {
+    if (!canReview) return false;
     const req = pendingRequests.find(r => r.reqId === reqId);
-    if (!req) return;
+    if (!req) return false;
+    const applied = req.type === 'delete'
+      ? !!req.targetId && await deletePerson(req.targetId)
+      : !!req.data && await upsertPerson(req.data);
+    if (!applied || !await updateRequestStatus(reqId, 'approved')) {
+      showToast('تعذر اعتماد الطلب، حاول مرة أخرى', 'error');
+      return false;
+    }
     if (req.type === 'add' || req.type === 'edit') {
       if (req.data) {
         setPersons(prev => {
@@ -110,9 +118,15 @@ export default function ModerationClient() {
     });
     setConfirmAction(null);
     showToast('✅ تم اعتماد الطلب بنجاح', 'success');
+    return true;
   };
 
-  const handleReject = (reqId: string) => {
+  const handleReject = async (reqId: string) => {
+    if (!canReview) return;
+    if (!await updateRequestStatus(reqId, 'rejected')) {
+      showToast('تعذر رفض الطلب، حاول مرة أخرى', 'error');
+      return;
+    }
     setPendingRequests(prev => {
       let updated = prev.filter(r => r.reqId !== reqId);
       localStorage.setItem('fam_requests', JSON.stringify(updated));
@@ -123,33 +137,15 @@ export default function ModerationClient() {
     showToast('❌ تم رفض الطلب', 'error');
   };
 
-  const handleApproveAll = () => {
+  const handleApproveAll = async () => {
+    if (!canReview) return;
     const toApprove = filteredRequests;
-    let updatedPersons = [...persons];
-    toApprove.forEach(req => {
-      if (req.type === 'add' || req.type === 'edit') {
-        if (req.data) {
-          const idx = updatedPersons.findIndex(p => p.id === req.data!.id);
-          if (idx >= 0) updatedPersons[idx] = req.data!;
-          else updatedPersons.push(req.data!);
-        }
-      } else if (req.type === 'delete' && req.targetId) {
-        updatedPersons = updatedPersons
-          .filter(p => p.id !== req.targetId)
-          .map(p => p.fatherId === req.targetId ? { ...p, fatherId: '' } : p);
-      }
-    });
-    localStorage.setItem('fam_nodes_backup', JSON.stringify(updatedPersons));
-    window.dispatchEvent(new Event('fam_nodes_changed'));
-    setPersons(updatedPersons);
-    const approvedIds = new Set(toApprove.map(r => r.reqId));
-    setPendingRequests(prev => {
-      let updated = prev.filter(r => !approvedIds.has(r.reqId));
-      localStorage.setItem('fam_requests', JSON.stringify(updated));
-      window.dispatchEvent(new Event('fam_requests_changed'));
-      return updated;
-    });
-    showToast(`✅ تم اعتماد ${toApprove.length} طلب`, 'success');
+    let approved = 0;
+    for (const req of toApprove) {
+      if (!await handleApprove(req.reqId)) return;
+      approved++;
+    }
+    showToast(`✅ تم اعتماد ${approved} طلب`, 'success');
   };
 
   const filteredRequests = useMemo(() =>
@@ -164,8 +160,6 @@ export default function ModerationClient() {
     delete: pendingRequests.filter(r => r.type === 'delete').length,
   }), [pendingRequests]);
 
-  const isAdmin = currentUser?.role === 'admin';
-  const canReview = currentUser?.role === 'admin' || currentUser?.role === 'supervisor';
 
   return (
     <div className="min-h-screen bg-default-canvas" style={{ direction: 'rtl' }}>
@@ -223,7 +217,7 @@ export default function ModerationClient() {
           <div className="glass rounded-2xl p-12 text-center">
             <div className="text-5xl mb-4">⛔</div>
             <h2 className="text-xl font-black text-foreground mb-2">غير مصرح</h2>
-            <p className="text-sm text-muted-foreground mb-6">هذه الصفحة مخصصة للمشرفين والمسؤولين فقط</p>
+            <p className="text-sm text-muted-foreground mb-6">ليست لديك صلاحية مراجعة واعتماد الطلبات</p>
             <Link href="/" className="btn-base btn-primary px-6 py-2.5">العودة للشجرة</Link>
           </div>
         ) : (
@@ -264,7 +258,7 @@ export default function ModerationClient() {
                   </button>
                 ))}
               </div>
-              {isAdmin && filteredRequests.length > 1 && (
+              {canReview && filteredRequests.length > 1 && (
                 <button
                   onClick={handleApproveAll}
                   className="btn-base btn-primary text-xs px-4 py-1.5 mr-auto"
@@ -327,7 +321,7 @@ export default function ModerationClient() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {isAdmin && (
+                          {canReview && (
                             <>
                               <button
                                 onClick={e => { e.stopPropagation(); setConfirmAction({ reqId: req.reqId, action: 'approve' }); }}
@@ -373,11 +367,6 @@ export default function ModerationClient() {
                               <span className="font-bold">ملاحظات: </span>{req.data.notes}
                             </div>
                           )}
-                          {!isAdmin && (
-                            <div className="mt-3 text-xs text-muted-foreground bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-3 py-2">
-                              ⚠️ صلاحية المراجعة والاعتماد متاحة للمسؤول فقط
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
@@ -390,7 +379,7 @@ export default function ModerationClient() {
       </main>
 
       {/* Confirm Dialog */}
-      {confirmAction && (
+      {confirmAction && canReview && (
         <div className="modal-backdrop" onClick={() => setConfirmAction(null)}>
           <div
             className="glass-modal modal-enter w-full max-w-sm mx-4 p-6 text-center"

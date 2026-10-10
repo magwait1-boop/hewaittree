@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Tajawal } from 'next/font/google';
+import { FamilySessionProvider } from '@/contexts/FamilySessionContext';
 import '../styles/tailwind.css';
 
 const tajawal = Tajawal({
@@ -28,8 +29,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl" className={tajawal.variable}>
-      <body className={tajawal.className}>{children}
-</body>
+      <body className={tajawal.className}>
+        <FamilySessionProvider>{children}</FamilySessionProvider>
+      </body>
     </html>
   );
 }

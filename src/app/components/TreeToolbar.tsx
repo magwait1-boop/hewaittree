@@ -2,6 +2,7 @@
 import React, { useMemo, useRef } from 'react';
 import type { CurrentUser } from './FamilyTreeClient';
 import type { Person } from '@/lib/familyData';
+import { getPermissions } from '@/lib/familyPermissions';
 
 interface Props {
   persons: Person[];
@@ -28,8 +29,8 @@ export default function TreeToolbar({
   onOpenSettings, onPrint,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const isEditor = currentUser?.role === 'admin' || currentUser?.role === 'supervisor';
-  const isAdmin = currentUser?.role === 'admin';
+  const permissions = getPermissions(currentUser);
+  const hasControls = permissions.can_edit || permissions.can_style || permissions.can_moderate;
 
   const totalPersons = persons.length;
   const totalBranches = useMemo(
@@ -105,15 +106,17 @@ export default function TreeToolbar({
         </div>
 
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-          {isEditor && <>
+          {permissions.can_style && (
             <button onClick={onOpenSettings} className="btn-base tree-toolbar-action" aria-label="الضبط">
               ⚙️ <span className="hidden lg:inline">الضبط</span>
             </button>
+          )}
+          {permissions.can_edit && (
             <button onClick={onAddPerson} className="btn-base btn-primary tree-toolbar-action" aria-label="إضافة شخص">
               ➕ <span className="hidden lg:inline">إضافة شخص</span>
             </button>
-          </>}
-          {isAdmin && (
+          )}
+          {permissions.can_moderate && (
             <button onClick={onOpenAdmin} className="btn-base tree-toolbar-action relative" aria-label="الطلبات">
               🔔 {pendingCount > 0 && <span className="badge-pending">{pendingCount}</span>}
               <span className="hidden lg:inline">الطلبات</span>
@@ -125,7 +128,7 @@ export default function TreeToolbar({
               🖨️ طباعة
             </button>
           </div>
-          <div className={isEditor ? 'hidden lg:block' : ''}>
+          <div className={hasControls ? 'hidden lg:block' : ''}>
             <span className="stat-pill whitespace-nowrap">
               <span className="inline-block h-2 w-2 rounded-full bg-primary" />
               {totalPersons.toLocaleString('ar-EG')} شخص

@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import type { Person } from '@/lib/familyData';
 import { getGeneration, getLineage, getTotalDescendants } from '@/lib/familyData';
 import type { CurrentUser } from './FamilyTreeClient';
+import { getPermissions } from '@/lib/familyPermissions';
 
 interface Props {
   nodeId: string | null;
@@ -58,8 +59,7 @@ export default function TreeSidebar({
     return (childrenMap.get(nodeId) || []).map((id) => personMap.get(id)).filter(Boolean) as Person[];
   }, [nodeId, childrenMap, personMap]);
 
-  const isEditor = currentUser?.role === 'admin' || currentUser?.role === 'supervisor';
-  const isAdmin = currentUser?.role === 'admin';
+  const permissions = getPermissions(currentUser);
 
   if (!person) {
     return (
@@ -176,23 +176,23 @@ export default function TreeSidebar({
         }
 
         {/* Actions */}
-        {isEditor &&
+        {(permissions.can_edit || permissions.can_delete || permissions.can_style) &&
         <div className="space-y-2 pt-2 border-t border-white/10">
-            <button
+            {permissions.can_edit && <button
             onClick={() => onEdit(person.id)}
             className="btn-base btn-primary w-full justify-center text-sm">
 
               ✎ تعديل بيانات الشخص
-            </button>
+            </button>}
             <div className="flex gap-2">
-              <button
+              {permissions.can_edit && <button
               onClick={() => onAddChild(person.id)}
               className="btn-base flex-1 justify-center text-sm"
               style={{ borderColor: '#3b82f6', color: '#93c5fd' }}>
 
                 + إضافة ابن
-              </button>
-              <button
+              </button>}
+              {permissions.can_delete && <button
               onClick={() => {
                 if (window.confirm(`هل تريد حذف "${person.name}"؟ لا يمكن التراجع.`)) {
                   onDelete(person.id);
@@ -201,9 +201,9 @@ export default function TreeSidebar({
               className="btn-base btn-danger flex-1 justify-center text-sm">
 
                 حذف
-              </button>
+              </button>}
             </div>
-            {isAdmin &&
+            {permissions.can_style &&
           <button
             onClick={() => onSelectDescendants(person.id)}
             className="btn-ghost btn-base w-full justify-center text-sm">

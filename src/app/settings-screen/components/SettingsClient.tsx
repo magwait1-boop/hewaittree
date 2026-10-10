@@ -12,6 +12,7 @@ import TreeStylePanel from './TreeStylePanel';
 import GenerationColorsPanel from './GenerationColorsPanel';
 import DataManagementPanel from './DataManagementPanel';
 import SupervisorsPanel from './SupervisorsPanel';
+import { useFamilySession } from '@/contexts/FamilySessionContext';
 
 export type SettingsTab = 'appearance' | 'tree-style' | 'generation-colors' | 'data' | 'supervisors';
 
@@ -20,7 +21,7 @@ const NAV_ITEMS: { id: SettingsTab; label: string; icon: string; desc: string }[
   { id: 'tree-style', label: 'أسلوب الشجرة', icon: '🌳', desc: 'أشكال العقد، خطوط الربط' },
   { id: 'generation-colors', label: 'ألوان الأجيال', icon: '🎭', desc: 'تخصيص كل جيل على حدة' },
   { id: 'data', label: 'إدارة البيانات', icon: '💾', desc: 'نسخ احتياطي، استيراد، تصدير' },
-  { id: 'supervisors', label: 'إدارة المشرفين', icon: '👥', desc: 'إضافة مشرفين وحذف حساباتهم' },
+  { id: 'supervisors', label: 'إدارة المشرفين', icon: '👥', desc: 'الحسابات والصلاحيات' },
 ];
 
 export default function SettingsClient() {
@@ -31,7 +32,11 @@ export default function SettingsClient() {
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [persons, setPersons] = useState<Person[]>([]);
-  const [currentUser, setCurrentUser] = useState<{ role: string } | null>(null);
+  const { currentUser, permissions } = useFamilySession();
+  const availableTabs = NAV_ITEMS.filter(item => item.id === 'supervisors'
+    ? currentUser?.role === 'admin'
+    : item.id === 'data' || permissions.can_style);
+  const visibleTab = availableTabs.some(item => item.id === activeTab) ? activeTab : 'data';
 
   // Keep pending local edits visible when returning to the settings screen.
   useEffect(() => {
@@ -66,12 +71,6 @@ export default function SettingsClient() {
     }
     loadSettings();
 
-    // Load current user for admin check
-    const savedUser = localStorage.getItem('fam_current_user');
-    if (savedUser) {
-      try { setCurrentUser(JSON.parse(savedUser)); } catch {}
-    }
-
     // Load persons for export
     fetchAllPersons().then(p => { if (p) setPersons(p); });
   }, []);
@@ -103,11 +102,13 @@ export default function SettingsClient() {
   }, []);
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
+    if (!permissions.can_style) return;
     setSettings(prev => ({ ...prev, ...patch }));
     setHasChanges(true);
-  }, []);
+  }, [permissions.can_style]);
 
   const handleSave = useCallback(async () => {
+    if (!permissions.can_style) return;
     setSaveStatus('saving');
     try {
       const settingsJson = JSON.stringify(settings);
@@ -127,9 +128,10 @@ export default function SettingsClient() {
       setSaveStatus('idle');
       toast.error('خطأ في حفظ الإعدادات');
     }
-  }, [settings]);
+  }, [settings, permissions.can_style]);
 
   const handleReset = useCallback(async () => {
+    if (!permissions.can_style) return;
     if (window.confirm('هل تريد إعادة ضبط جميع الإعدادات للقيم الافتراضية؟')) {
       setSettings(DEFAULT_SETTINGS);
       const defaultJson = JSON.stringify(DEFAULT_SETTINGS);
@@ -140,9 +142,10 @@ export default function SettingsClient() {
       setHasChanges(false);
       toast.success('تم إعادة ضبط الإعدادات');
     }
-  }, []);
+  }, [permissions.can_style]);
 
   const handleImport = useCallback(async (data: Person[], _merge: boolean) => {
+    if (currentUser?.role !== 'admin') return;
     const total = data.length;
     const toastId = toast.loading(`جارٍ استيراد ${total.toLocaleString('ar-EG')} شخص...`);
     const ok = await replaceAllPersons(data);
@@ -153,7 +156,7 @@ export default function SettingsClient() {
     } else {
       toast.error('تعذّر الاستيراد — تحقق من الاتصال');
     }
-  }, []);
+  }, [currentUser]);
 
   const handleExportCSV = useCallback(() => {
     const headers = 'id,name,gender,fatherId,branch,birthDate,deathDate,notes,leafColor,nodeScale,manualX,manualY';
@@ -210,10 +213,10 @@ export default function SettingsClient() {
           {saveStatus === 'saved' && (
             <span className="mr-auto text-xs text-primary font-semibold">✓ تم الحفظ</span>
           )}
-          <button onClick={handleReset} className="btn-base btn-danger text-xs">
+          {permissions.can_style && <button onClick={handleReset} className="btn-base btn-danger text-xs">
             إعادة ضبط
-          </button>
-          <button
+          </button>}
+          {permissions.can_style && <button
             onClick={handleSave}
             disabled={saveStatus === 'saving' || isLoading}
             className="btn-base btn-primary text-sm px-5"
@@ -227,7 +230,7 @@ export default function SettingsClient() {
                 حفظ...
               </span>
             ) : '💾 حفظ الإعدادات'}
-          </button>
+          </button>}
         </div>
       </header>
 
@@ -236,12 +239,12 @@ export default function SettingsClient() {
         <nav aria-label="أقسام الإعدادات" className="w-full min-w-0 flex-shrink-0 glass-sidebar p-3 md:w-64 md:p-4 md:overflow-y-auto scrollbar-thin md:sticky md:top-14 md:self-start md:max-h-[calc(100vh-3.5rem)]">
           <p className="settings-label px-2 mb-3 hidden md:block">الأقسام</p>
           <div className="flex gap-2 overflow-x-auto scrollbar-thin md:block md:space-y-1">
-            {NAV_ITEMS.filter(item => item.id !== 'supervisors' || currentUser?.role === 'admin').map(item => (
+            {availableTabs.map(item => (
               <button
                 key={`nav-${item.id}`}
                 onClick={() => setActiveTab(item.id)}
-                aria-current={activeTab === item.id ? 'page' : undefined}
-                className={`nav-item-settings w-auto flex-shrink-0 text-right md:w-full ${activeTab === item.id ? 'active' : ''}`}
+                aria-current={visibleTab === item.id ? 'page' : undefined}
+                className={`nav-item-settings w-auto flex-shrink-0 text-right md:w-full ${visibleTab === item.id ? 'active' : ''}`}
               >
                 <span className="text-lg">{item.icon}</span>
                 <div className="flex-1 min-w-0">
@@ -304,16 +307,16 @@ export default function SettingsClient() {
         {/* Right Content — scrollable with proper bottom padding */}
         <main className="min-w-0 flex-1 overflow-y-auto scrollbar-thin p-3 sm:p-6 pb-32" style={{ overflowY: 'auto' }}>
           <div className="max-w-2xl min-w-0 mx-auto">
-            {activeTab === 'appearance' && (
+            {visibleTab === 'appearance' && permissions.can_style && (
               <AppearancePanel settings={settings} onUpdate={updateSettings} />
             )}
-            {activeTab === 'tree-style' && (
+            {visibleTab === 'tree-style' && permissions.can_style && (
               <TreeStylePanel settings={settings} onUpdate={updateSettings} />
             )}
-            {activeTab === 'generation-colors' && (
+            {visibleTab === 'generation-colors' && permissions.can_style && (
               <GenerationColorsPanel settings={settings} onUpdate={updateSettings} />
             )}
-            {activeTab === 'data' && (
+            {visibleTab === 'data' && (
               <DataManagementPanel
                 onReset={handleReset}
                 onImport={handleImport}
@@ -322,7 +325,7 @@ export default function SettingsClient() {
                 isAdmin={currentUser?.role === 'admin'}
               />
             )}
-            {activeTab === 'supervisors' && currentUser?.role === 'admin' && (
+            {visibleTab === 'supervisors' && currentUser?.role === 'admin' && (
               <SupervisorsPanel />
             )}
           </div>
@@ -330,7 +333,7 @@ export default function SettingsClient() {
       </div>
 
       {/* Sticky save bar */}
-      {hasChanges && (
+      {hasChanges && permissions.can_style && (
         <div className="fixed bottom-0 left-0 right-0 glass-panel border-t border-white/10 px-6 py-3 flex items-center justify-between z-30 animate-slide-up">
           <span className="text-sm font-semibold text-warning">
             ⚠ لديك تغييرات غير محفوظة

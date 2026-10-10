@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 interface Props {
-  onLogin: (username: string, password: string) => boolean;
+  onLogin: (username: string, password: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -21,10 +21,14 @@ export default function AuthModal({ onLogin, onClose }: Props) {
   const [loginError, setLoginError] = useState('');
   const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<FormData>();
 
-  const onSubmit = (data: FormData) => {
-    const ok = onLogin(data.username, data.password);
-    if (ok) { onClose(); }
-    else { setLoginError('بيانات الدخول غير صحيحة — استخدم أحد الحسابات التجريبية أدناه'); }
+  const onSubmit = async (data: FormData) => {
+    setLoginError('');
+    try {
+      await onLogin(data.username, data.password);
+      onClose();
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : 'تعذر تسجيل الدخول');
+    }
   };
 
   return (
