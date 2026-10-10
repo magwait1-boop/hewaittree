@@ -348,6 +348,10 @@
   .custom-input::placeholder {
     color: var(--text-dim);
   }
+  .supervisor-form .custom-input {
+    min-height: 48px;
+    font-size: 16px;
+  }
   .custom-select {
     width: 100%;
     background: rgba(255,255,255,0.06);

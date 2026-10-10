@@ -11,14 +11,16 @@ import AppearancePanel from './AppearancePanel';
 import TreeStylePanel from './TreeStylePanel';
 import GenerationColorsPanel from './GenerationColorsPanel';
 import DataManagementPanel from './DataManagementPanel';
+import SupervisorsPanel from './SupervisorsPanel';
 
-export type SettingsTab = 'appearance' | 'tree-style' | 'generation-colors' | 'data';
+export type SettingsTab = 'appearance' | 'tree-style' | 'generation-colors' | 'data' | 'supervisors';
 
 const NAV_ITEMS: { id: SettingsTab; label: string; icon: string; desc: string }[] = [
   { id: 'appearance', label: 'المظهر العام', icon: '🎨', desc: 'الخلفية، الألوان، الخط' },
   { id: 'tree-style', label: 'أسلوب الشجرة', icon: '🌳', desc: 'أشكال العقد، خطوط الربط' },
   { id: 'generation-colors', label: 'ألوان الأجيال', icon: '🎭', desc: 'تخصيص كل جيل على حدة' },
   { id: 'data', label: 'إدارة البيانات', icon: '💾', desc: 'نسخ احتياطي، استيراد، تصدير' },
+  { id: 'supervisors', label: 'إدارة المشرفين', icon: '👥', desc: 'إضافة مشرفين وحذف حساباتهم' },
 ];
 
 export default function SettingsClient() {
@@ -182,29 +184,31 @@ export default function SettingsClient() {
       style={{ direction: 'rtl', fontFamily: 'var(--font-sans)', overflowY: 'auto', height: '100vh' }}
     >
       {/* Top bar */}
-      <header className="glass-panel h-14 flex items-center px-6 gap-4 flex-shrink-0 z-10 relative sticky top-0">
-        <button
-          onClick={() => { window.location.href = '/'; }}
-          className="btn-base text-sm"
-          aria-label="العودة للشجرة"
-        >
-          ← العودة للشجرة
-        </button>
-        <div className="flex items-center gap-2 mr-2">
-          <AppLogo size={28} />
-          <span className="font-black text-sm text-foreground hidden sm:block">إعدادات الشجرة</span>
+      <header className="glass-panel flex flex-wrap items-center gap-2 px-3 py-3 sm:h-14 sm:flex-nowrap sm:gap-4 sm:px-6 sm:py-0 flex-shrink-0 z-10 sticky top-0">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+          <button
+            onClick={() => { window.location.href = '/'; }}
+            className="btn-base text-sm"
+            aria-label="العودة للشجرة"
+          >
+            ← العودة للشجرة
+          </button>
+          <div className="flex items-center gap-2 mr-2">
+            <AppLogo size={28} />
+            <span className="font-black text-sm text-foreground hidden sm:block">إعدادات الشجرة</span>
+          </div>
         </div>
-        <div className="mr-auto flex items-center gap-3">
+        <div className="mr-auto flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto sm:gap-3">
           {isLoading && (
-            <span className="text-xs text-muted-foreground animate-pulse">جارٍ التحميل...</span>
+            <span className="mr-auto text-xs text-muted-foreground animate-pulse">جارٍ التحميل...</span>
           )}
           {hasChanges && !isLoading && (
-            <span className="text-xs text-warning font-semibold animate-pulse">
+            <span className="mr-auto text-xs text-warning font-semibold animate-pulse">
               ● تغييرات غير محفوظة
             </span>
           )}
           {saveStatus === 'saved' && (
-            <span className="text-xs text-primary font-semibold">✓ تم الحفظ</span>
+            <span className="mr-auto text-xs text-primary font-semibold">✓ تم الحفظ</span>
           )}
           <button onClick={handleReset} className="btn-base btn-danger text-xs">
             إعادة ضبط
@@ -227,26 +231,29 @@ export default function SettingsClient() {
         </div>
       </header>
 
-      <div className="flex flex-1" style={{ minHeight: 0 }}>
+      <div className="flex min-w-0 flex-1 flex-col md:flex-row" style={{ minHeight: 0 }}>
         {/* Left Nav */}
-        <nav className="w-64 flex-shrink-0 glass-sidebar p-4 space-y-1 overflow-y-auto scrollbar-thin" style={{ maxHeight: 'calc(100vh - 3.5rem)', position: 'sticky', top: '3.5rem', alignSelf: 'flex-start' }}>
-          <p className="settings-label px-2 mb-3">الأقسام</p>
-          {NAV_ITEMS.map(item => (
-            <button
-              key={`nav-${item.id}`}
-              onClick={() => setActiveTab(item.id)}
-              className={`nav-item-settings w-full text-right ${activeTab === item.id ? 'active' : ''}`}
-            >
-              <span className="text-lg">{item.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm truncate">{item.label}</div>
-                <div className="text-xs text-muted-foreground truncate">{item.desc}</div>
-              </div>
-            </button>
-          ))}
+        <nav aria-label="أقسام الإعدادات" className="w-full min-w-0 flex-shrink-0 glass-sidebar p-3 md:w-64 md:p-4 md:overflow-y-auto scrollbar-thin md:sticky md:top-14 md:self-start md:max-h-[calc(100vh-3.5rem)]">
+          <p className="settings-label px-2 mb-3 hidden md:block">الأقسام</p>
+          <div className="flex gap-2 overflow-x-auto scrollbar-thin md:block md:space-y-1">
+            {NAV_ITEMS.filter(item => item.id !== 'supervisors' || currentUser?.role === 'admin').map(item => (
+              <button
+                key={`nav-${item.id}`}
+                onClick={() => setActiveTab(item.id)}
+                aria-current={activeTab === item.id ? 'page' : undefined}
+                className={`nav-item-settings w-auto flex-shrink-0 text-right md:w-full ${activeTab === item.id ? 'active' : ''}`}
+              >
+                <span className="text-lg">{item.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm truncate">{item.label}</div>
+                  <div className="hidden md:block text-xs text-muted-foreground truncate">{item.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
 
           {/* Live preview mini */}
-          <div className="mt-6 pt-4 border-t border-white/10">
+          <div className="hidden md:block mt-6 pt-4 border-t border-white/10">
             <p className="settings-label px-2 mb-3">معاينة مصغرة</p>
             <div
               className={`rounded-xl overflow-hidden h-24 flex items-center justify-center relative ${
@@ -295,8 +302,8 @@ export default function SettingsClient() {
         </nav>
 
         {/* Right Content — scrollable with proper bottom padding */}
-        <main className="flex-1 overflow-y-auto scrollbar-thin p-6 pb-32" style={{ overflowY: 'auto' }}>
-          <div className="max-w-2xl mx-auto">
+        <main className="min-w-0 flex-1 overflow-y-auto scrollbar-thin p-3 sm:p-6 pb-32" style={{ overflowY: 'auto' }}>
+          <div className="max-w-2xl min-w-0 mx-auto">
             {activeTab === 'appearance' && (
               <AppearancePanel settings={settings} onUpdate={updateSettings} />
             )}
@@ -314,6 +321,9 @@ export default function SettingsClient() {
                 onExportJSON={handleExportJSON}
                 isAdmin={currentUser?.role === 'admin'}
               />
+            )}
+            {activeTab === 'supervisors' && currentUser?.role === 'admin' && (
+              <SupervisorsPanel />
             )}
           </div>
         </main>
