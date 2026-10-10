@@ -29,6 +29,33 @@ interface CanvasSize { w: number; h: number; }
 
 // Minimum movement (px) before a pointer-down is treated as a pan/drag, not a tap
 const TAP_THRESHOLD = 5;
+const MIN_PINCH_DISTANCE = 15;
+
+interface PointerPosition { x: number; y: number; }
+
+function isFinitePosition(point: PointerPosition | null | undefined): point is PointerPosition {
+  return !!point && Number.isFinite(point.x) && Number.isFinite(point.y);
+}
+
+function getPinchGesture(pointers: Map<number, PointerPosition>) {
+  const points = Array.from(pointers.values());
+  if (points.length < 2) return null;
+  const [first, second] = points;
+  if (!isFinitePosition(first) || !isFinitePosition(second)) return null;
+
+  const distance = Math.hypot(second.x - first.x, second.y - first.y);
+  const midpoint = { x: first.x / 2 + second.x / 2, y: first.y / 2 + second.y / 2 };
+  if (!Number.isFinite(distance) || distance < MIN_PINCH_DISTANCE || !isFinitePosition(midpoint)) return null;
+  return { distance, midpoint };
+}
+
+function capturePointer(element: SVGElement, pointerId: number) {
+  try {
+    element.setPointerCapture?.(pointerId);
+  } catch {
+    // A pointer can end before capture, or capture may be unavailable.
+  }
+}
 
 function getGenerationOverride(settings: AppSettings, generation: number) {
   const overrides = settings.generationOverrides;
@@ -77,12 +104,12 @@ export default function TreeCanvas({
   const bgPointerDown = useRef(false);
 
   // Track active pointer count for pinch-zoom disambiguation
-  const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const activePointers = useRef<Map<number, PointerPosition>>(new Map());
   // Track total movement to distinguish tap from pan
   const pointerMoved = useRef(false);
   // Track pinch state
   const lastPinchDist = useRef<number | null>(null);
-  const lastPinchMid = useRef<{ x: number; y: number } | null>(null);
+  const lastPinchMid = useRef<PointerPosition | null>(null);
 
   // Keep a stable ref to onPrintDone so the afterprint listener doesn't go stale
   const onPrintDoneRef = useRef(onPrintDone);
@@ -189,124 +216,114 @@ export default function TreeCanvas({
     return () => element.removeEventListener('wheel', handleNativeWheel);
   }, [handleWheel]);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+  const beginPointer = useCallback((e: React.PointerEvent<SVGElement>, nodeId: string | null) => {
+    if (!isFinitePosition({ x: e.clientX, y: e.clientY })) return;
+    if (activePointers.current.size === 0) pointerMoved.current = false;
     activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    pointerMoved.current = false;
     bgPointerDown.current = false;
+    capturePointer(svgRef.current ?? e.currentTarget, e.pointerId);
 
     if (activePointers.current.size >= 2) {
+      // A second finger starts a pinch even when it lands on a node.
+      pointerMoved.current = true;
+      lastClickTime.current = 0;
       isDraggingNode.current = false;
       dragNodeId.current = null;
       clickedNodeId.current = null;
       isPanning.current = false;
-      const pts = Array.from(activePointers.current.values());
-      const dx = pts[1].x - pts[0].x;
-      const dy = pts[1].y - pts[0].y;
-      const initialPinchDist = Math.hypot(dx, dy);
-      lastPinchDist.current = initialPinchDist >= 10 ? initialPinchDist : null;
-      lastPinchMid.current = {
-        x: (pts[0].x + pts[1].x) / 2,
-        y: (pts[0].y + pts[1].y) / 2,
-      };
-      (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
+      const gesture = getPinchGesture(activePointers.current);
+      lastPinchDist.current = gesture?.distance ?? null;
+      lastPinchMid.current = gesture?.midpoint ?? null;
       return;
     }
 
-    // Background pointer-down — track for deselect
-    bgPointerDown.current = true;
+    lastPinchDist.current = null;
+    lastPinchMid.current = null;
+    if (!nodeId) {
+      bgPointerDown.current = true;
+      isPanning.current = true;
+      panStart.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+      return;
+    }
 
-    // Pan
-    isPanning.current = true;
-    panStart.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
-    (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
-  }, [view.x, view.y, canDrag, onNodeDblClick]);
-
-  const handleNodePointerDown = useCallback((e: React.PointerEvent<SVGGElement>) => {
-    e.stopPropagation();
-    // Reuse the canvas pointer bookkeeping while preventing this event from
-    // reaching the SVG's background handler.
-    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    pointerMoved.current = false;
-    bgPointerDown.current = false;
-    const id = e.currentTarget.getAttribute('data-node-id');
-    if (!id) return;
-    clickedNodeId.current = id;
+    clickedNodeId.current = nodeId;
     const now = Date.now();
     if (now - lastClickTime.current < 350) {
-      onNodeDblClick(id);
+      onNodeDblClick(nodeId);
       lastClickTime.current = 0;
       return;
     }
     lastClickTime.current = now;
     if (canDrag) {
       isDraggingNode.current = true;
-      dragNodeId.current = id;
+      dragNodeId.current = nodeId;
       dragStart.current = { clientX: e.clientX, clientY: e.clientY };
-      e.currentTarget.setPointerCapture(e.pointerId);
     }
-  }, [canDrag, onNodeDblClick]);
+  }, [view.x, view.y, canDrag, onNodeDblClick]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    beginPointer(e, null);
+  }, [beginPointer]);
+
+  const handleNodePointerDown = useCallback((e: React.PointerEvent<SVGGElement>) => {
+    e.stopPropagation();
+    const id = e.currentTarget.getAttribute('data-node-id');
+    if (id) beginPointer(e, id);
+  }, [beginPointer]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
-    if (activePointers.current.has(e.pointerId)) {
-      const prev = activePointers.current.get(e.pointerId)!;
-      const dx = e.clientX - prev.x;
-      const dy = e.clientY - prev.y;
-      if (Math.sqrt(dx * dx + dy * dy) > TAP_THRESHOLD) {
-        pointerMoved.current = true;
-      }
-      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const prev = activePointers.current.get(e.pointerId);
+    if (!isFinitePosition(prev) || !isFinitePosition({ x: e.clientX, y: e.clientY })) return;
+    if (Math.hypot(e.clientX - prev.x, e.clientY - prev.y) > TAP_THRESHOLD) {
+      pointerMoved.current = true;
     }
+    activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (activePointers.current.size >= 2) {
-      const pts = Array.from(activePointers.current.values());
-      const dx = pts[1].x - pts[0].x;
-      const dy = pts[1].y - pts[0].y;
-      const dist = Math.hypot(dx, dy);
-      const mid = {
-        x: (pts[0].x + pts[1].x) / 2,
-        y: (pts[0].y + pts[1].y) / 2,
-      };
-
-      const lastDist = lastPinchDist.current;
-      const prevDistance = lastDist;
-      const currentDistance = dist;
-      if (!prevDistance || prevDistance < 10 || currentDistance < 10) {
-        lastPinchDist.current = dist;
-        lastPinchMid.current = mid;
+      const gesture = getPinchGesture(activePointers.current);
+      if (!gesture) {
+        lastPinchDist.current = null;
+        lastPinchMid.current = null;
         return;
       }
-      if (lastPinchMid.current !== null) {
-        const rect = svgRef.current?.getBoundingClientRect();
-        if (rect) {
-          const cx = mid.x - rect.left;
-          const cy = mid.y - rect.top;
-          const ratio = dist / lastDist;
-          if (!Number.isFinite(ratio)) return;
-          setView(v => {
-            const currentScale = Number.isFinite(v.scale) && v.scale > 0 ? v.scale : 1;
-            const currentX = Number.isFinite(v.x) ? v.x : 0;
-            const currentY = Number.isFinite(v.y) ? v.y : 0;
-            const xs = (cx - currentX) / currentScale;
-            const ys = (cy - currentY) / currentScale;
-            const rawScale = currentScale * ratio;
-            if (!Number.isFinite(rawScale)) return { x: currentX, y: currentY, scale: currentScale };
-            const ns = Math.max(0.2, Math.min(3, rawScale));
-            const pmx = mid.x - lastPinchMid.current!.x;
-            const pmy = mid.y - lastPinchMid.current!.y;
-            const x = cx - xs * ns + pmx;
-            const y = cy - ys * ns + pmy;
-            return Number.isFinite(ns) && Number.isFinite(x) && Number.isFinite(y)
-              ? { x, y, scale: ns }
-              : { x: currentX, y: currentY, scale: currentScale };
-          });
-        }
-      }
 
-      lastPinchDist.current = dist;
-      lastPinchMid.current = mid;
+      // Snapshot gesture data before React queues the state update. Pointer-up
+      // and subsequent moves can reset or replace these refs before it runs.
+      const previousDistance = lastPinchDist.current;
+      const previousMid = lastPinchMid.current;
+      const { distance, midpoint } = gesture;
+      lastPinchDist.current = distance;
+      lastPinchMid.current = midpoint;
+      if (previousDistance === null || !Number.isFinite(previousDistance) ||
+          previousDistance <= MIN_PINCH_DISTANCE || !isFinitePosition(previousMid)) return;
+
+      const ratio = distance / previousDistance;
+      if (!Number.isFinite(ratio) || ratio <= 0.5 || ratio >= 2) return;
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect || !Number.isFinite(rect.left) || !Number.isFinite(rect.top)) return;
+      const previousX = previousMid.x - rect.left;
+      const previousY = previousMid.y - rect.top;
+      const currentX = midpoint.x - rect.left;
+      const currentY = midpoint.y - rect.top;
+
+      setView(v => {
+        const scale = Number.isFinite(v.scale) && v.scale > 0 ? v.scale : 1;
+        const panX = Number.isFinite(v.x) ? v.x : 0;
+        const panY = Number.isFinite(v.y) ? v.y : 0;
+        const rawScale = scale * ratio;
+        if (!Number.isFinite(rawScale)) return { x: panX, y: panY, scale };
+        const nextScale = Math.min(Math.max(rawScale, 0.2), 3);
+        const x = currentX - ((previousX - panX) / scale) * nextScale;
+        const y = currentY - ((previousY - panY) / scale) * nextScale;
+        return Number.isFinite(x) && Number.isFinite(y)
+          ? { x, y, scale: nextScale }
+          : { x: panX, y: panY, scale };
+      });
       return;
     }
 
+    lastPinchDist.current = null;
+    lastPinchMid.current = null;
     if (isDraggingNode.current && dragNodeId.current) {
       const safeScale = Number.isFinite(view.scale) && view.scale > 0 ? view.scale : 1;
       const dx = (e.clientX - dragStart.current.clientX) / safeScale;
@@ -324,6 +341,7 @@ export default function TreeCanvas({
   }, [view.scale, onNodeDrag, setView]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    if (!activePointers.current.has(e.pointerId)) return;
     activePointers.current.delete(e.pointerId);
 
     if (activePointers.current.size < 2) {
@@ -353,6 +371,20 @@ export default function TreeCanvas({
     bgPointerDown.current = false;
     pointerMoved.current = false;
   }, [onNodeClick, onBgClick]);
+
+  const handlePointerCancel = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    if (!activePointers.current.has(e.pointerId)) return;
+    activePointers.current.delete(e.pointerId);
+    lastPinchDist.current = null;
+    lastPinchMid.current = null;
+    isDraggingNode.current = false;
+    dragNodeId.current = null;
+    isPanning.current = false;
+    clickedNodeId.current = null;
+    bgPointerDown.current = false;
+    pointerMoved.current = true;
+    lastClickTime.current = 0;
+  }, []);
 
   const renderEdgePath = (parent: Person, child: Person): string => {
     const { w: pw, h: ph } = getNodeDimensions(parent);
@@ -501,7 +533,8 @@ export default function TreeCanvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onLostPointerCapture={handlePointerCancel}
     >
       <defs>
         <filter id="shadow">
