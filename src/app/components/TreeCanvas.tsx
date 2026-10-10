@@ -89,7 +89,10 @@ export default function TreeCanvas({
   useEffect(() => { onPrintDoneRef.current = onPrintDone; }, [onPrintDone]);
 
   useEffect(() => {
-    const update = () => setCanvasSize({ w: window.innerWidth, h: window.innerHeight - 112 });
+    const update = () => setCanvasSize({
+      w: Math.max(0, window.innerWidth),
+      h: Math.max(0, window.innerHeight - 112),
+    });
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
@@ -125,12 +128,12 @@ export default function TreeCanvas({
     const baseFontSize = genOverride?.fontSize ?? p.cardFontSize ?? settings.baseFontSize;
     const scale = genOverride?.scale ?? p.nodeScale ?? 1;
     const fs = baseFontSize * scale;
-    const w = p.cardWidth
+    const w = Math.max(0, p.cardWidth
       ? p.cardWidth * scale
-      : Math.max(50 * scale, p.name.length * baseFontSize * 0.55 * scale + 20 * scale);
-    const h = p.cardHeight
+      : Math.max(50 * scale, p.name.length * baseFontSize * 0.55 * scale + 20 * scale));
+    const h = Math.max(0, p.cardHeight
       ? p.cardHeight * scale
-      : (baseFontSize + 20) * scale;
+      : (baseFontSize + 20) * scale);
     return { w, h, fs, scale };
   }, [settings.baseFontSize, getGenOverride]);
 
@@ -378,12 +381,12 @@ export default function TreeCanvas({
       })();
       const baseFontSize = genOverride?.fontSize ?? p.cardFontSize ?? settings.baseFontSize;
       const scale = genOverride?.scale ?? p.nodeScale ?? 1;
-      const w = p.cardWidth
+      const w = Math.max(0, p.cardWidth
         ? p.cardWidth * scale
-        : Math.max(50 * scale, p.name.length * baseFontSize * 0.55 * scale + 20 * scale);
-      const h = p.cardHeight
+        : Math.max(50 * scale, p.name.length * baseFontSize * 0.55 * scale + 20 * scale));
+      const h = Math.max(0, p.cardHeight
         ? p.cardHeight * scale
-        : (baseFontSize + 20) * scale;
+        : (baseFontSize + 20) * scale);
       return { w, h };
     };
 
@@ -391,8 +394,8 @@ export default function TreeCanvas({
     const PAD = 150;
     const vbX = minX - PAD;
     const vbY = minY - PAD - 120; // extra top space for title badge
-    const vbW = maxX - minX + PAD * 2;
-    const vbH = maxY - minY + PAD * 2 + 120;
+    const vbW = Math.max(0, maxX - minX + PAD * 2);
+    const vbH = Math.max(0, maxY - minY + PAD * 2 + 120);
 
     svgRef.current.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
     svgRef.current.setAttribute('width', '100%');
@@ -404,7 +407,7 @@ export default function TreeCanvas({
       const g = document.createElementNS(ns, 'g');
       g.setAttribute('id', 'print-title-badge');
 
-      const badgeW = Math.min(vbW * 0.6, 1800);
+      const badgeW = Math.max(0, Math.min(vbW * 0.6, 1800));
       const badgeH = 110;
       const badgeX = vbX + vbW / 2 - badgeW / 2;
       const badgeY = vbY + 10;
@@ -412,8 +415,8 @@ export default function TreeCanvas({
       const rect = document.createElementNS(ns, 'rect');
       rect.setAttribute('x', String(badgeX));
       rect.setAttribute('y', String(badgeY));
-      rect.setAttribute('width', String(badgeW));
-      rect.setAttribute('height', String(badgeH));
+      rect.setAttribute('width', String(Math.max(0, badgeW)));
+      rect.setAttribute('height', String(Math.max(0, badgeH)));
       rect.setAttribute('rx', '16');
       rect.setAttribute('fill', '#0f172a');
       rect.setAttribute('stroke', '#e1d019');
@@ -468,8 +471,8 @@ export default function TreeCanvas({
     const handleAfterPrint = () => {
       if (svgRef.current) {
         svgRef.current.removeAttribute('viewBox');
-        svgRef.current.setAttribute('width', String(canvasSize.w));
-        svgRef.current.setAttribute('height', String(canvasSize.h));
+        svgRef.current.setAttribute('width', String(Math.max(0, canvasSize.w)));
+        svgRef.current.setAttribute('height', String(Math.max(0, canvasSize.h)));
         const badge = svgRef.current.querySelector('#print-title-badge');
         if (badge) badge.remove();
       }
@@ -491,8 +494,8 @@ export default function TreeCanvas({
   return (
     <svg
       ref={svgRef}
-      width={canvasSize.w}
-      height={canvasSize.h}
+      width={Math.max(0, canvasSize.w)}
+      height={Math.max(0, canvasSize.h)}
       style={{ display: 'block', userSelect: 'none', touchAction: 'none', overscrollBehavior: 'none' }}
       className="touch-none"
       onPointerDown={handlePointerDown}
@@ -521,8 +524,8 @@ export default function TreeCanvas({
       {/* Transparent background rect — captures bg clicks for deselect */}
       <rect
         x={0} y={0}
-        width={canvasSize.w}
-        height={canvasSize.h}
+        width={Math.max(0, canvasSize.w)}
+        height={Math.max(0, canvasSize.h)}
         fill="transparent"
         style={{ cursor: 'default' }}
       />
@@ -607,7 +610,7 @@ export default function TreeCanvas({
                 {shape === 'ellipse' ? (
                   <ellipse
                     cx={x} cy={y}
-                    rx={w / 2} ry={h / 2}
+                    rx={Math.max(0, w / 2)} ry={Math.max(0, h / 2)}
                     fill={color}
                     stroke={strokeColor}
                     strokeWidth={strokeWidth}
@@ -615,8 +618,8 @@ export default function TreeCanvas({
                 ) : (
                   <rect
                     x={x - w / 2} y={y - h / 2}
-                    width={w} height={h}
-                    rx={customRadius !== undefined ? customRadius : (shape === 'pill' ? h / 2 : 8 * scale)}
+                    width={Math.max(0, w)} height={Math.max(0, h)}
+                    rx={Math.max(0, customRadius !== undefined ? customRadius : (shape === 'pill' ? h / 2 : 8 * scale))}
                     fill={color}
                     stroke={strokeColor}
                     strokeWidth={strokeWidth}

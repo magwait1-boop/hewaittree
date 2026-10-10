@@ -357,10 +357,10 @@ export default function FamilyTreeClient() {
     const ys = persons.map(p => p.manualY);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const W = typeof window !== 'undefined' ? window.innerWidth : 1440;
-    const H = typeof window !== 'undefined' ? window.innerHeight - 120 : 800;
-    const scaleX = (W - 100) / (maxX - minX || 1);
-    const scaleY = (H - 100) / (maxY - minY || 1);
+    const W = Math.max(0, typeof window !== 'undefined' ? window.innerWidth : 1440);
+    const H = Math.max(0, typeof window !== 'undefined' ? window.innerHeight - 120 : 800);
+    const scaleX = Math.max(0, W - 100) / (Math.max(0, maxX - minX) || 1);
+    const scaleY = Math.max(0, H - 100) / (Math.max(0, maxY - minY) || 1);
     const s = Math.min(scaleX, scaleY, 0.5);
     const midX = (minX + maxX) / 2;
     const midY = (minY + maxY) / 2;
@@ -370,8 +370,8 @@ export default function FamilyTreeClient() {
   const centerOnNode = useCallback((id: string) => {
     const p = personMap.get(id);
     if (!p) return;
-    const W = typeof window !== 'undefined' ? window.innerWidth : 1440;
-    const H = typeof window !== 'undefined' ? window.innerHeight - 120 : 800;
+    const W = Math.max(0, typeof window !== 'undefined' ? window.innerWidth : 1440);
+    const H = Math.max(0, typeof window !== 'undefined' ? window.innerHeight - 120 : 800);
     const s = 1.3;
     setSafeView({ x: W / 2 - p.manualX * s, y: H / 2 - p.manualY * s, scale: s });
   }, [personMap, setSafeView]);
@@ -431,9 +431,9 @@ export default function FamilyTreeClient() {
     const ys = persons.map(p => p.manualY);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const W = typeof window !== 'undefined' ? window.innerWidth : 1440;
-    const H = typeof window !== 'undefined' ? window.innerHeight - 120 : 800;
-    const s = Math.min((W - 100) / (maxX - minX || 1), (H - 100) / (maxY - minY || 1), 0.5);
+    const W = Math.max(0, typeof window !== 'undefined' ? window.innerWidth : 1440);
+    const H = Math.max(0, typeof window !== 'undefined' ? window.innerHeight - 120 : 800);
+    const s = Math.min(Math.max(0, W - 100) / (Math.max(0, maxX - minX) || 1), Math.max(0, H - 100) / (Math.max(0, maxY - minY) || 1), 0.5);
     const midX = (minX + maxX) / 2;
     const midY = (minY + maxY) / 2;
     setSafeView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
