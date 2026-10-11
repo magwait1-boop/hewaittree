@@ -107,6 +107,50 @@ test('printing includes cards outside the current viewport and every connecting 
   assert.equal(edges.length, 2);
 });
 
+test('printing includes every card and connection as the tree grows beyond 2767 cards', () => {
+  for (const count of [2767, 5000, 10000]) {
+    const growingPersons = Array.from({ length: count }, (_, index) => ({
+      id: `person-${index}`,
+      name: `Person ${index}`,
+      gender: index % 2 ? 'أنثى' : 'ذكر',
+      fatherId: index ? `person-${index - 1}` : '',
+      manualX: (index % 2 ? -1 : 1) * (10000 + index * 250),
+      manualY: (index % 3 ? 1 : -1) * (20000 + index * 180),
+      cardWidth: 140,
+      cardHeight: 40,
+    }));
+    const printed = createCanvas({
+      isPrinting: true,
+      persons: growingPersons,
+      personMap: new Map(growingPersons.map(person => [person.id, person])),
+      childrenMap: new Map(growingPersons.slice(0, -1).map((person, index) => [person.id, [growingPersons[index + 1].id]])),
+      settings: {
+        baseFontSize: 14,
+        generationOverrides: {},
+        maleShape: 'pill',
+        femaleShape: 'ellipse',
+        lineStyle: 'straight',
+      },
+      view: { x: -9000000, y: 8000000, scale: 0.1 },
+    });
+
+    assert.deepEqual(
+      nodeElements(printed).map(node => node.props['data-node-id']),
+      growingPersons.map(person => person.id),
+      `all ${count} distinct cards must be printed regardless of their positions or screen view`,
+    );
+    const edges = visit(printed, element => element.type === 'path' && element.props.stroke !== 'transparent');
+    assert.deepEqual(
+      edges.map(({ element }) => element.props.d),
+      growingPersons.slice(1).map((child, index) => {
+        const parent = growingPersons[index];
+        return `M ${parent.manualX} ${parent.manualY + 20} L ${child.manualX} ${child.manualY - 20}`;
+      }),
+      `all ${count - 1} connecting edges must be printed exactly once`,
+    );
+  }
+});
+
 test('print geometry and stroke widths are independent of screen zoom and pan', () => {
   const baseline = printSnapshot(createCanvas({ isPrinting: true }));
   for (const view of [

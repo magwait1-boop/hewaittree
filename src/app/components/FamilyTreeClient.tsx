@@ -957,6 +957,9 @@ export default function FamilyTreeClient() {
           className="no-print fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-sm bg-slate-900/95 backdrop-blur border-2 border-emerald-500/80 p-5 rounded-2xl shadow-2xl flex flex-col gap-4 text-white"
         >
           <h3 id="tree-print-title" className="font-bold text-base">🖨️ طباعة كامل الشجرة</h3>
+          <p className="text-sm text-emerald-300">
+            عدد البطاقات في الطباعة: <strong>{persons.length.toLocaleString('ar-EG')}</strong>
+          </p>
           <p className="text-xs text-slate-300 leading-relaxed">
             تشمل المعاينة جميع البطاقات والخطوط. يطابق مقاس الصفحة حدودها من جميع الجهات دون هوامش إضافية.
             تُحفظ النصوص والخطوط بجودة متجهية لعرض التفاصيل عند التكبير أو الحفظ بصيغة PDF.
