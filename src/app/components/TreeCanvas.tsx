@@ -1,8 +1,9 @@
 'use client';
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import React, { useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import type { Person, AppSettings } from '@/lib/familyData';
 import { getGeneration } from '@/lib/familyData';
 import type { ViewState } from './FamilyTreeClient';
+import { measurePrintBounds, getPrintPageSize, type PrintBounds } from '@/lib/treePrint';
 
 interface Props {
   persons: Person[];
@@ -23,6 +24,8 @@ interface Props {
   onBgClick?: () => void;
   isPrinting?: boolean;
   onPrintDone?: () => void;
+  onPrintReady?: () => void;
+  printBackground?: string;
 }
 
 interface CanvasSize { w: number; h: number; }
@@ -65,33 +68,16 @@ function getGenerationOverride(settings: AppSettings, generation: number) {
   return overrides[generation] ?? Object.entries(overrides).find(([key]) => Number(key) === generation)?.[1] ?? null;
 }
 
-// ─── A0 Print helpers ────────────────────────────────────────────────────────
-
-/** Calculate the tight bounding box of all active nodes */
-function calcBoundingBox(
-  persons: Person[],
-  getDims: (p: Person) => { w: number; h: number }
-) {
-  if (persons.length === 0) return { minX: -500, minY: -500, maxX: 500, maxY: 500 };
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of persons) {
-    const { w, h } = getDims(p);
-    minX = Math.min(minX, p.manualX - w / 2);
-    maxX = Math.max(maxX, p.manualX + w / 2);
-    minY = Math.min(minY, p.manualY - h / 2);
-    maxY = Math.max(maxY, p.manualY + h / 2);
-  }
-  return { minX, minY, maxX, maxY };
-}
-
 export default function TreeCanvas({
   persons, view, setView, settings,
   searchMatches, selectedIds, sidebarNodeId,
   onNodeClick, onNodeDblClick, onNodeDrag, onEdgeClick, canEditEdges = false, canDrag,
   personMap, childrenMap, onBgClick,
-  isPrinting = false, onPrintDone,
+  isPrinting = false, onPrintDone, onPrintReady, printBackground = '#ffffff',
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const contentRef = useRef<SVGGElement>(null);
+  const [printBounds, setPrintBounds] = useState<PrintBounds | null>(null);
   const [canvasSize, setCanvasSize] = useState<CanvasSize>({ w: 1440, h: 900 });
   const isPanning = useRef(false);
   const panStart = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
@@ -114,6 +100,8 @@ export default function TreeCanvas({
   // Keep a stable ref to onPrintDone so the afterprint listener doesn't go stale
   const onPrintDoneRef = useRef(onPrintDone);
   useEffect(() => { onPrintDoneRef.current = onPrintDone; }, [onPrintDone]);
+  const onPrintReadyRef = useRef(onPrintReady);
+  useEffect(() => { onPrintReadyRef.current = onPrintReady; }, [onPrintReady]);
 
   useEffect(() => {
     const container = svgRef.current?.parentElement;
@@ -402,137 +390,66 @@ export default function TreeCanvas({
     return `M ${fx} ${fy} C ${fx} ${my}, ${nx} ${my}, ${nx} ${ny}`;
   };
 
-  // ─── Step 1: When isPrinting becomes true, set up the SVG for full-tree print ───
-  // This effect runs after React has rendered all 2000+ nodes into the DOM.
-  useEffect(() => {
-    if (!isPrinting) return;
-    if (!svgRef.current || persons.length === 0) return;
-
-    // Calculate tight bounding box from ALL nodes
-    const getDims = (p: Person) => {
-      const genOverride = (() => {
-        const gen = getGeneration(p.id, personMap);
-        return getGenerationOverride(settings, gen);
-      })();
-      const baseFontSize = genOverride?.fontSize ?? p.cardFontSize ?? settings.baseFontSize;
-      const scale = genOverride?.scale ?? p.nodeScale ?? 1;
-      const w = Math.max(0, p.cardWidth
-        ? p.cardWidth * scale
-        : Math.max(50 * scale, p.name.length * baseFontSize * 0.55 * scale + 20 * scale));
-      const h = Math.max(0, p.cardHeight
-        ? p.cardHeight * scale
-        : (baseFontSize + 20) * scale);
-      return { w, h };
-    };
-
-    const { minX, minY, maxX, maxY } = calcBoundingBox(persons, getDims);
-    const PAD = 150;
-    const vbX = minX - PAD;
-    const vbY = minY - PAD - 120; // extra top space for title badge
-    const vbW = Math.max(0, maxX - minX + PAD * 2);
-    const vbH = Math.max(0, maxY - minY + PAD * 2 + 120);
-
-    svgRef.current.setAttribute('viewBox', `${vbX} ${vbY} ${vbW} ${vbH}`);
-    svgRef.current.setAttribute('width', '100%');
-    svgRef.current.setAttribute('height', '100%');
-
-    // Inject print title badge if not already present
-    if (!svgRef.current.querySelector('#print-title-badge')) {
-      const ns = 'http://www.w3.org/2000/svg';
-      const g = document.createElementNS(ns, 'g');
-      g.setAttribute('id', 'print-title-badge');
-
-      const badgeW = Math.max(0, Math.min(vbW * 0.6, 1800));
-      const badgeH = 110;
-      const badgeX = vbX + vbW / 2 - badgeW / 2;
-      const badgeY = vbY + 10;
-
-      const rect = document.createElementNS(ns, 'rect');
-      rect.setAttribute('x', String(badgeX));
-      rect.setAttribute('y', String(badgeY));
-      rect.setAttribute('width', String(Math.max(0, badgeW)));
-      rect.setAttribute('height', String(Math.max(0, badgeH)));
-      rect.setAttribute('rx', '16');
-      rect.setAttribute('fill', '#0f172a');
-      rect.setAttribute('stroke', '#e1d019');
-      rect.setAttribute('stroke-width', '3');
-      g.appendChild(rect);
-
-      const cx = String(vbX + vbW / 2);
-
-      const t1 = document.createElementNS(ns, 'text');
-      t1.setAttribute('x', cx);
-      t1.setAttribute('y', String(badgeY + 34));
-      t1.setAttribute('text-anchor', 'middle');
-      t1.setAttribute('font-family', 'Tajawal, Arial, sans-serif');
-      t1.setAttribute('font-size', '28');
-      t1.setAttribute('font-weight', 'bold');
-      t1.setAttribute('fill', '#e1d019');
-      t1.setAttribute('direction', 'rtl');
-      t1.textContent = 'شجرة عائلة آل حويت بكفر هلال';
-      g.appendChild(t1);
-
-      const t2 = document.createElementNS(ns, 'text');
-      t2.setAttribute('x', cx);
-      t2.setAttribute('y', String(badgeY + 64));
-      t2.setAttribute('text-anchor', 'middle');
-      t2.setAttribute('font-family', 'Tajawal, Arial, sans-serif');
-      t2.setAttribute('font-size', '20');
-      t2.setAttribute('fill', '#94a3b8');
-      t2.setAttribute('direction', 'rtl');
-      t2.textContent = `إجمالي أفراد العائلة: ${persons.length.toLocaleString('ar-EG')}`;
-      g.appendChild(t2);
-
-      const t3 = document.createElementNS(ns, 'text');
-      t3.setAttribute('x', cx);
-      t3.setAttribute('y', String(badgeY + 96));
-      t3.setAttribute('text-anchor', 'middle');
-      t3.setAttribute('font-family', 'Tajawal, Arial, sans-serif');
-      t3.setAttribute('font-size', '18');
-      t3.setAttribute('fill', '#cbd5e1');
-      t3.setAttribute('direction', 'rtl');
-      t3.textContent = 'تم التطوير وجمع البيانات بواسطة: م. مجدي حويت & م. عبداللطيف حويت';
-      g.appendChild(t3);
-
-      svgRef.current.insertBefore(g, svgRef.current.firstChild);
+  // Render every card at its original coordinates before measuring. Layout
+  // effects also run synchronously when the browser's beforeprint event fires.
+  useLayoutEffect(() => {
+    if (!isPrinting || !contentRef.current) {
+      setPrintBounds(null);
+      return;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPrinting, persons]);
+    let cancelled = false;
+    const measure = () => {
+      if (!cancelled && contentRef.current) setPrintBounds(measurePrintBounds(contentRef.current));
+    };
+    measure();
+    void (document.fonts?.ready ?? Promise.resolve()).then(() => {
+      if (cancelled) return;
+      measure();
+      onPrintReadyRef.current?.();
+    });
+    return () => { cancelled = true; };
+  }, [isPrinting, persons, getNodeDimensions, settings.lineStyle]);
 
-  // ─── Step 3: After print dialog closes, restore SVG and reset isPrinting ───
+  useLayoutEffect(() => {
+    if (!isPrinting || !printBounds) return;
+    const { widthMm, heightMm } = getPrintPageSize(printBounds);
+    const style = document.createElement('style');
+    style.textContent = `
+      @page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
+      @media print {
+        .family-tree {
+          --tree-print-width: ${widthMm}mm;
+          --tree-print-height: ${heightMm}mm;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, [isPrinting, printBounds]);
+
   useEffect(() => {
     if (!isPrinting) return;
-
-    const handleAfterPrint = () => {
-      if (svgRef.current) {
-        svgRef.current.removeAttribute('viewBox');
-        svgRef.current.setAttribute('width', String(Math.max(0, canvasSize.w)));
-        svgRef.current.setAttribute('height', String(Math.max(0, canvasSize.h)));
-        const badge = svgRef.current.querySelector('#print-title-badge');
-        if (badge) badge.remove();
-      }
-      onPrintDoneRef.current?.();
-    };
-
-    window.addEventListener('afterprint', handleAfterPrint, { once: true });
-
-    return () => {
-      window.removeEventListener('afterprint', handleAfterPrint);
-    };
-  }, [isPrinting, canvasSize.w, canvasSize.h]);
+    const handleAfterPrint = () => onPrintDoneRef.current?.();
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, [isPrinting]);
 
   const safeZoom = Math.min(Math.max(Number.isFinite(view.scale) ? view.scale : 1, 0.2), 3.0);
   const safePanX = Number.isFinite(view.x) ? Math.round(view.x) : 0;
   const safePanY = Number.isFinite(view.y) ? Math.round(view.y) : 0;
   const transformStr = `translate(${safePanX}, ${safePanY}) scale(${safeZoom})`;
+  const drawingScale = isPrinting ? 1 : safeZoom;
+  const whitePaper = printBackground === '#ffffff';
 
   return (
     <svg
       ref={svgRef}
       width={Math.max(0, canvasSize.w)}
       height={Math.max(0, canvasSize.h)}
-      style={{ display: 'block', userSelect: 'none', touchAction: 'none', overscrollBehavior: 'none' }}
-      className="touch-none"
+      viewBox={isPrinting && printBounds ? `${printBounds.x} ${printBounds.y} ${printBounds.width} ${printBounds.height}` : undefined}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: 'block', userSelect: 'none', touchAction: 'none', overscrollBehavior: 'none', background: isPrinting ? printBackground : undefined }}
+      className="tree-svg touch-none"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -566,21 +483,21 @@ export default function TreeCanvas({
         style={{ cursor: 'default' }}
       />
 
-      <g transform={transformStr}>
+      <g ref={contentRef} data-tree-content transform={isPrinting ? undefined : transformStr}>
         {/* Edges */}
         <g>
           {visibleEdges.map(child => {
             const parent = personMap.get(child.fatherId);
             if (!parent) return null;
             const d = renderEdgePath(parent, child);
-            const strokeColor = child.edgeColor || 'rgba(255,255,255,0.25)';
+            const strokeColor = child.edgeColor || (isPrinting && whitePaper ? '#475569' : 'rgba(255,255,255,0.25)');
             return (
               <g key={`edge-${child.id}`}>
-                <path
+                {!isPrinting && <path
                   d={d}
                   fill="none"
                   stroke="transparent"
-                  strokeWidth={14 / view.scale}
+                  strokeWidth={14 / drawingScale}
                   pointerEvents="stroke"
                   className={canEditEdges ? 'cursor-pointer' : undefined}
                   onPointerDown={e => { if (canEditEdges) e.stopPropagation(); }}
@@ -590,14 +507,14 @@ export default function TreeCanvas({
                     e.stopPropagation();
                     onEdgeClick?.(child.id);
                   }}
-                />
+                />}
                 <path
                   d={d}
                   stroke={strokeColor}
-                  strokeWidth={(child.edgeWidth ?? 2) / view.scale}
+                  strokeWidth={(child.edgeWidth ?? 2) / drawingScale}
                   fill="none"
                   strokeLinecap="round"
-                  opacity={0.7}
+                  opacity={isPrinting ? 1 : 0.7}
                   pointerEvents="none"
                 />
               </g>
@@ -611,22 +528,22 @@ export default function TreeCanvas({
             const { w, h, fs, scale } = getNodeDimensions(p);
             const shape = getShape(p);
             const color = getNodeColor(p);
-            const isHighlighted = searchMatches.includes(p.id);
-            const isSelected = p.id === sidebarNodeId;
-            const isDescendant = selectedIds.has(p.id);
+            const isHighlighted = !isPrinting && searchMatches.includes(p.id);
+            const isSelected = !isPrinting && p.id === sidebarNodeId;
+            const isDescendant = !isPrinting && selectedIds.has(p.id);
             const isRoot = !p.fatherId;
 
-            let strokeColor = 'rgba(255,255,255,0.2)';
-            let strokeWidth = 1 / view.scale;
+            let strokeColor = isPrinting && whitePaper ? '#64748b' : 'rgba(255,255,255,0.2)';
+            let strokeWidth = 1 / drawingScale;
             let filterAttr = 'url(#shadow)';
 
             if (p.cardBorderColor) strokeColor = p.cardBorderColor;
-            if (p.cardBorderWidth !== undefined) strokeWidth = p.cardBorderWidth / view.scale;
+            if (p.cardBorderWidth !== undefined) strokeWidth = p.cardBorderWidth / drawingScale;
 
-            if (isHighlighted) { strokeColor = '#fbbf24'; strokeWidth = 4 / view.scale; filterAttr = 'url(#glow-highlight)'; }
-            else if (isRoot) { strokeColor = p.cardBorderColor || '#e1d019'; strokeWidth = (p.cardBorderWidth ?? 3) / view.scale; filterAttr = 'url(#glow-root)'; }
-            else if (isDescendant) { strokeColor = '#c084fc'; strokeWidth = 4 / view.scale; filterAttr = 'url(#glow-descendant)'; }
-            else if (isSelected) { strokeColor = '#38bdf8'; strokeWidth = 3 / view.scale; filterAttr = 'url(#glow-selected)'; }
+            if (isHighlighted) { strokeColor = '#fbbf24'; strokeWidth = 4 / drawingScale; filterAttr = 'url(#glow-highlight)'; }
+            else if (isRoot) { strokeColor = p.cardBorderColor || '#e1d019'; strokeWidth = (p.cardBorderWidth ?? 3) / drawingScale; filterAttr = 'url(#glow-root)'; }
+            else if (isDescendant) { strokeColor = '#c084fc'; strokeWidth = 4 / drawingScale; filterAttr = 'url(#glow-descendant)'; }
+            else if (isSelected) { strokeColor = '#38bdf8'; strokeWidth = 3 / drawingScale; filterAttr = 'url(#glow-selected)'; }
 
             const x = p.manualX;
             const y = p.manualY;
@@ -638,7 +555,7 @@ export default function TreeCanvas({
                 key={`node-${p.id}`}
                 data-node-id={p.id}
                 className="node-group"
-                filter={filterAttr}
+                filter={isPrinting ? undefined : filterAttr}
                 onPointerDown={handleNodePointerDown}
                 onMouseDown={e => e.stopPropagation()}
                 onClick={e => e.stopPropagation()}

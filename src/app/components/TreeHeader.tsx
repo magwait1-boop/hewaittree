@@ -21,33 +21,6 @@ export default function TreeHeader({
 
   return (
     <>
-      {/* ── Print-only info card ── */}
-      <div
-        className="print-only"
-        style={{
-          display: 'none',
-          direction: 'rtl',
-          textAlign: 'center',
-          padding: '20px 24px 14px',
-          background: '#0f172a',
-          borderBottom: '3px solid #c8a84b',
-          fontFamily: "'Tajawal', 'Amiri', sans-serif",
-          color: '#f1f5f9',
-          pageBreakAfter: 'avoid',
-          width: '100%',
-        }}
-      >
-        <div style={{ fontSize: '24px', fontWeight: 900, color: '#f0d080', letterSpacing: '0.04em', marginBottom: '8px' }}>
-          شجرة عائلة آل حويت بكفر هلال
-        </div>
-        <div style={{ fontSize: '15px', color: '#94a3b8', marginBottom: '6px' }}>
-          إجمالي أفراد العائلة: <strong style={{ color: '#f0d080' }}>{count.toLocaleString('ar-EG')}</strong> فرد
-        </div>
-        <div style={{ fontSize: '13px', color: '#64748b' }}>
-          تم التطوير وجمع البيانات بواسطة: م. مجدي حويت &amp; م. عبداللطيف حويت
-        </div>
-      </div>
-
       <header
         className="glass-panel no-print absolute top-0 left-0 right-0 z-30 h-14 flex items-center px-3 sm:px-4 gap-2 sm:gap-3 border-b-0"
         style={{ direction: 'rtl' }}>

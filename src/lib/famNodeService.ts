@@ -169,6 +169,9 @@ export async function fetchAllPersons(): Promise<Person[] | null> {
         .from('fam_nodes')
         .select('*')
         .order('manual_y', { ascending: true })
+        // Cards in the same generation often share Y coordinates. A unique
+        // tie-breaker keeps their order stable across all paginated requests.
+        .order('id', { ascending: true })
         .range(start, end);
 
       if (error) {
