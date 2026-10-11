@@ -23,11 +23,13 @@ function createCanvas(overrides = {}) {
     useState: initial => [initial, () => {}],
     useCallback: callback => callback,
     useEffect: () => {},
+    useLayoutEffect: () => {},
   };
   const module = { exports: {} };
   new Function('require', 'module', 'exports', outputText)(name => {
     if (name === 'react') return hooks;
     if (name === '@/lib/familyData') return { getGeneration: () => 1 };
+    if (name === '@/lib/treePrint') return {};
     return require(name);
   }, module, module.exports);
   const canvas = module.exports.default({

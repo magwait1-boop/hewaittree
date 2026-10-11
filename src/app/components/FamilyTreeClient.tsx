@@ -1,6 +1,7 @@
 'use client';
 import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { flushSync } from 'react-dom';
 import { MOCK_PERSONS, DEFAULT_SETTINGS, LOCAL_SETTINGS_PENDING_KEY, buildChildrenMap, buildPersonMap, buildNameIndex, searchPersons, normalizeSettings, type Person, type PendingRequest, type AppSettings,  } from '@/lib/familyData';
 import { useFamilySession } from '@/contexts/FamilySessionContext';
 export type { CurrentUser } from '@/lib/familyPermissions';
@@ -116,6 +117,9 @@ export default function FamilyTreeClient() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isPrintReady, setIsPrintReady] = useState(false);
+  const [printBackground, setPrintBackground] = useState('#ffffff');
+  const onPrintReady = useCallback(() => setIsPrintReady(true), []);
   const [edgeStylePersonId, setEdgeStylePersonId] = useState<string | null>(null);
 
   // Derive these maps during render so TreeCanvas always receives indexes for
@@ -717,8 +721,28 @@ export default function FamilyTreeClient() {
   }, [persons]);
 
   const handlePrint = useCallback(() => {
+    if (isPrinting) return;
+    if (isLoadingData || persons.length === 0) {
+      toast('انتظر تحميل البطاقات قبل الطباعة');
+      return;
+    }
+    setIsPrintReady(false);
     setIsPrinting(true);
+  }, [isPrinting, isLoadingData, persons.length]);
+
+  // Browser menu / Ctrl+P must include cards outside the screen as well.
+  useEffect(() => {
+    const preparePrint = () => flushSync(() => setIsPrinting(true));
+    window.addEventListener('beforeprint', preparePrint);
+    return () => window.removeEventListener('beforeprint', preparePrint);
   }, []);
+
+  const printTree = async () => {
+    if (!isPrintReady) return;
+    await document.fonts?.ready;
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    window.print();
+  };
 
   const openAddPerson = useCallback((parentId = '') => {
     if (!permissions.can_edit) return;
@@ -846,6 +870,8 @@ export default function FamilyTreeClient() {
               closePersonDetails();
             }}
             isPrinting={isPrinting}
+            printBackground={printBackground}
+            onPrintReady={onPrintReady}
             onPrintDone={() => setIsPrinting(false)}
           />
         </CanvasErrorBoundary>
@@ -924,82 +950,42 @@ export default function FamilyTreeClient() {
         }}
       />
 
-      {/* نافذة الـ Plot بنظام الأوتوكاد الكامل */}
       {isPrinting && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-slate-900/95 backdrop-blur border-2 border-emerald-500/80 p-5 rounded-2xl shadow-2xl flex flex-col gap-4 dir-rtl min-w-[380px] text-white">
-          <div className="flex items-center justify-between border-b border-slate-700 pb-2">
-            <h3 className="font-bold text-base flex items-center gap-2">
-              <span>🖨️</span> إعدادات الطباعة (Plot Model)
-            </h3>
-            <span className="text-xs text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">AutoCAD Style</span>
-          </div>
-
-          {/* Plot Area */}
+        <div
+          role="dialog"
+          aria-labelledby="tree-print-title"
+          className="no-print fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-sm bg-slate-900/95 backdrop-blur border-2 border-emerald-500/80 p-5 rounded-2xl shadow-2xl flex flex-col gap-4 text-white"
+        >
+          <h3 id="tree-print-title" className="font-bold text-base">🖨️ طباعة كامل الشجرة</h3>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            تشمل المعاينة جميع البطاقات والخطوط. يطابق مقاس الصفحة حدودها من جميع الجهات دون هوامش إضافية.
+            تُحفظ النصوص والخطوط بجودة متجهية لعرض التفاصيل عند التكبير أو الحفظ بصيغة PDF.
+          </p>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">منطقة الطباعة (Plot Area):</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                className="py-1.5 px-3 rounded-lg text-xs font-medium border border-emerald-500 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition-colors"
-                onClick={() => {
-                  toast.success('تم تحديد كامل حدود الشجرة (Extents)');
-                }}
-              >
-                كامل الشجرة (Extents)
-              </button>
-              <button
-                type="button"
-                className="py-1.5 px-3 rounded-lg text-xs font-medium border border-slate-600 bg-slate-800 text-slate-200 hover:border-emerald-500 hover:text-emerald-300 transition-colors"
-                onClick={() => {
-                  toast('استخدم الماوس للتحريك والتقريب وضبط الكادر المطلوب طباعته حالياً', { icon: '📐' });
-                }}
-              >
-                نافذة محددة (Window)
-              </button>
-            </div>
-          </div>
-
-          {/* Background Color */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300">لون خلفية الطباعة:</label>
+            <label htmlFor="tree-print-background" className="text-xs font-semibold text-slate-300">لون خلفية الطباعة:</label>
             <select
+              id="tree-print-background"
+              value={printBackground}
               className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg p-2 text-xs focus:outline-none focus:border-emerald-500"
-              onChange={(e) => {
-                document.body.style.backgroundColor = e.target.value;
-              }}
+              onChange={event => setPrintBackground(event.target.value)}
             >
-              <option value="#ffffff">أبيض (ورق طباعة A0 - موصى به)</option>
-              <option value="#0f172a">داكن (نفس مظهر الشاشة)</option>
+              <option value="#ffffff">أبيض</option>
+              <option value="#0f172a">داكن</option>
             </select>
           </div>
-
-          {/* Action Buttons: Preview, Plot, Cancel */}
           <div className="flex gap-2 pt-2 border-t border-slate-700/80">
             <button
               type="button"
-              className="flex-1 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 text-xs font-bold py-2 rounded-lg transition-colors"
-              onClick={() => {
-                toast('تم ضبط المعاينة للكادر الحالي', { icon: '👁️' });
-              }}
+              disabled={!isPrintReady}
+              className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 text-xs font-bold py-2 rounded-lg transition-colors"
+              onClick={printTree}
             >
-              معاينة (Preview)
-            </button>
-            <button
-              type="button"
-              className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold py-2 rounded-lg transition-colors shadow-lg shadow-emerald-500/20"
-              onClick={() => {
-                window.print();
-              }}
-            >
-              طباعة (Plot)
+              {isPrintReady ? 'طباعة / حفظ PDF' : 'جارٍ تجهيز البطاقات والخطوط…'}
             </button>
             <button
               type="button"
               className="px-3 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 text-xs font-medium py-2 rounded-lg transition-colors"
-              onClick={() => {
-                document.body.style.backgroundColor = '';
-                setIsPrinting(false);
-              }}
+              onClick={() => setIsPrinting(false)}
             >
               إلغاء
             </button>

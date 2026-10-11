@@ -602,81 +602,49 @@
   .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 }
 
-/* ── Print Styles ── */
+/* Page dimensions are measured from the complete SVG in TreeCanvas. */
 @media print {
-  /* Show print-only elements */
-  .print-only {
-    display: block !important;
+  html, body {
+    width: auto;
+    height: auto;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* Hide UI chrome */
   .no-print,
-  header.glass-panel,
-  .glass-panel.no-print,
-  nav,
-  button,
-  .sidebar-wrap,
-  .zoom-controls,
-  [class*="ZoomControls"],
-  [class*="TreeToolbar"],
-  [class*="TreeHeader"],
-  [class*="TreeSidebar"] {
+  .family-tree > :not(.tree-canvas-wrap) {
     display: none !important;
   }
 
-  /* Reset page */
-  html, body {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    background: #0f172a !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    overflow: visible !important;
-  }
-
-  /* Make the tree canvas fill the page */
+  .family-tree,
   .tree-canvas-wrap {
     position: static !important;
-    top: auto !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
+    inset: auto !important;
+    width: var(--tree-print-width) !important;
+    height: var(--tree-print-height) !important;
+    margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
-    width: 100% !important;
-    height: auto !important;
     display: block !important;
+    background: none !important;
+    break-inside: avoid;
   }
 
-  /* SVG fills the page */
-  .tree-canvas-wrap svg {
-    width: 100% !important;
-    height: auto !important;
-    min-height: 100vh !important;
+  .tree-canvas-wrap > .tree-svg {
+    width: var(--tree-print-width) !important;
+    height: var(--tree-print-height) !important;
+    min-height: 0 !important;
+    max-width: none !important;
     display: block !important;
-    overflow: visible !important;
+    overflow: hidden !important;
   }
 
-  /* Ensure SVG elements render — do NOT set display:block on SVG children */
-  svg {
-    visibility: visible !important;
-    overflow: visible !important;
-  }
-
-  svg g,
-  svg path,
-  svg rect,
-  svg ellipse,
-  svg line,
-  svg text {
-    visibility: visible !important;
-  }
-
-  /* Page setup — A0 landscape for full tree */
-  @page {
-    size: A0 landscape;
-    margin: 10mm;
+  .tree-svg .node-group {
+    filter: none !important;
+    transition: none !important;
   }
 }
