@@ -2,6 +2,8 @@ import React from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Tajawal } from 'next/font/google';
 import { FamilySessionProvider } from '@/contexts/FamilySessionContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { themeInitializationScript } from '@/lib/theme';
 import '../styles/tailwind.css';
 
 const tajawal = Tajawal({
@@ -28,9 +30,14 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ar" dir="rtl" className={tajawal.variable}>
+    <html lang="ar" dir="rtl" data-theme="dark" className={`${tajawal.variable} dark`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
+      </head>
       <body className={tajawal.className}>
-        <FamilySessionProvider>{children}</FamilySessionProvider>
+        <ThemeProvider>
+          <FamilySessionProvider>{children}</FamilySessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

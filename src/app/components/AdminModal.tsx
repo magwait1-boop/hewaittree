@@ -14,6 +14,7 @@ interface Props {
 
 const TYPE_LABELS: Record<string, string> = { add: 'إضافة', edit: 'تعديل', delete: 'حذف' };
 const TYPE_COLORS: Record<string, string> = { add: '#10b981', edit: '#f59e0b', delete: '#ef4444' };
+const TYPE_TEXT_COLORS: Record<string, string> = { add: 'var(--primary)', edit: 'var(--warning)', delete: 'var(--danger)' };
 
 export default function AdminModal({ requests: initialRequests, personMap, onApprove, onReject, onClose }: Props) {
   const [requests, setRequests] = useState<PendingRequest[]>(initialRequests);
@@ -81,7 +82,7 @@ export default function AdminModal({ requests: initialRequests, personMap, onApp
                       <div className="flex items-center gap-2 mb-2">
                         <span
                           className="text-xs font-black px-2 py-0.5 rounded-full"
-                          style={{ background: `${TYPE_COLORS[req.type]}22`, color: TYPE_COLORS[req.type], border: `1px solid ${TYPE_COLORS[req.type]}44` }}
+                          style={{ background: `${TYPE_COLORS[req.type]}22`, color: TYPE_TEXT_COLORS[req.type], border: `1px solid ${TYPE_COLORS[req.type]}44` }}
                         >
                           {TYPE_LABELS[req.type]}
                         </span>

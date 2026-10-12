@@ -3,17 +3,11 @@ import React, { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
+import ThemeToggle from '@/app/components/ThemeToggle';
 import { useFamilySession } from '@/contexts/FamilySessionContext';
 import { Toaster, toast } from 'sonner';
 
 interface FormData { username: string; password: string; }
-
-const DEMO_ACCOUNTS = [
-  { role: 'مسؤول' as const, username: 'magwait', password: '@mg2208!QAZ', desc: 'صلاحيات كاملة' },
-  { role: 'مشرف' as const, username: 'lateef74', password: '@LAT12345678', desc: 'إرسال طلبات' },
-  { role: 'مشرف' as const, username: 'hewait18', password: '@MAG12345678', desc: 'إرسال طلبات' },
-  { role: 'مشرف' as const, username: 'hewait20', password: '@MAG12345678', desc: 'إرسال طلبات' },
-];
 
 const STATS = [
   { label: 'إجمالي الأفراد', value: '2,214', icon: '👥' },
@@ -27,7 +21,7 @@ export default function LoginClient() {
   const { signIn } = useFamilySession();
   const [showPass, setShowPass] = useState(false);
   const [loginError, setLoginError] = useState('');
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>();
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>();
 
   const onSubmit = useCallback(async (data: FormData) => {
     setLoginError('');
@@ -39,12 +33,6 @@ export default function LoginClient() {
       setLoginError(error instanceof Error ? error.message : 'تعذر تسجيل الدخول');
     }
   }, [router, signIn]);
-
-  const autofill = useCallback((username: string, password: string) => {
-    setValue('username', username);
-    setValue('password', password);
-    setLoginError('');
-  }, [setValue]);
 
   return (
     <div
@@ -144,6 +132,7 @@ export default function LoginClient() {
 
       {/* Right — Login Form */}
       <div className="flex-1 flex flex-col justify-center px-6 py-10 lg:px-12 max-w-lg mx-auto lg:mx-0 w-full">
+        <div className="mb-4 flex justify-end"><ThemeToggle /></div>
         {/* Mobile logo */}
         <div className="flex items-center gap-2 mb-8 lg:hidden">
           <AppLogo size={36} />
@@ -239,16 +228,15 @@ export default function LoginClient() {
           </form>
         </div>
 
-        {/* Demo Credentials Table — hidden */}
       </div>
 
       <Toaster
         position="bottom-right"
         toastOptions={{
           style: {
-            background: 'rgba(15,23,42,0.98)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            color: '#e2e8f0',
+            background: 'var(--glass-modal)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--text-main)',
             fontFamily: 'Tajawal, sans-serif',
             direction: 'rtl',
           },

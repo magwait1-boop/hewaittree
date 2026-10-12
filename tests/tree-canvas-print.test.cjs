@@ -23,17 +23,22 @@ function loadTypeScript(relativePath, mocks = {}) {
 }
 
 const printHelpers = loadTypeScript('../src/lib/treePrint.ts');
+const viewportHelpers = loadTypeScript('../src/lib/treeViewport.ts', {
+  './familyData': { getGeneration: () => 1 },
+});
 const TreeCanvas = loadTypeScript('../src/app/components/TreeCanvas.tsx', {
   react: {
     ...React,
     useRef: current => ({ current }),
     useState: initial => [initial, () => {}],
     useCallback: callback => callback,
+    useMemo: callback => callback(),
     useEffect: () => {},
     useLayoutEffect: () => {},
   },
   '@/lib/familyData': { getGeneration: () => 1 },
   '@/lib/treePrint': printHelpers,
+  '@/lib/treeViewport': viewportHelpers,
 }).default;
 
 const persons = [
@@ -105,6 +110,33 @@ test('printing includes cards outside the current viewport and every connecting 
   assert.deepEqual(nodeElements(printed).map(node => node.props['data-node-id']), persons.map(person => person.id));
   const edges = visit(printed, element => element.type === 'path' && element.props.stroke !== 'transparent');
   assert.equal(edges.length, 2);
+});
+
+test('screen rendering keeps large cards whose centers are outside the viewport', () => {
+  const person = { id: 'wide', name: 'Wide card', fatherId: '', gender: 'ذكر', manualX: -800, manualY: 300, cardWidth: 1800 };
+  const canvas = createCanvas({ persons: [person], personMap: new Map([[person.id, person]]) });
+  assert.deepEqual(nodeElements(canvas).map(node => node.props['data-node-id']), ['wide']);
+});
+
+test('screen rendering retains a connecting edge crossing the viewport with both nodes offscreen', () => {
+  const outside = [
+    { id: 'left', name: 'Left', fatherId: '', gender: 'ذكر', manualX: -1000, manualY: 100 },
+    { id: 'right', name: 'Right', fatherId: 'left', gender: 'ذكر', manualX: 2400, manualY: 700 },
+  ];
+  const canvas = createCanvas({ persons: outside, personMap: new Map(outside.map(person => [person.id, person])) });
+  assert.equal(nodeElements(canvas).length, 0);
+  const edges = visit(canvas, element => element.type === 'path' && element.props.stroke !== 'transparent');
+  assert.equal(edges.length, 1);
+});
+
+test('full-tree fit below 20% uses the same view for card culling and SVG rendering', () => {
+  const bounds = viewportHelpers.getTreeBounds(persons, { baseFontSize: 14, generationOverrides: {} }, new Map(persons.map(person => [person.id, person])));
+  const view = viewportHelpers.getFitView(bounds, { w: 1440, h: 900 });
+  assert.ok(view.scale < 0.2);
+  const canvas = createCanvas({ view, minZoom: viewportHelpers.getMinimumZoom(bounds, { w: 1440, h: 900 }) });
+  assert.deepEqual(nodeElements(canvas).map(node => node.props['data-node-id']), persons.map(person => person.id));
+  const content = visit(canvas, element => element.props['data-tree-content'])[0].element;
+  assert.ok(content.props.transform.endsWith(`scale(${view.scale})`));
 });
 
 test('printing includes every card and connection as the tree grows beyond 2767 cards', () => {

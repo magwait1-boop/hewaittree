@@ -9,17 +9,10 @@ interface Props {
 
 interface FormData { username: string; password: string; }
 
-const DEMO_ACCOUNTS = [
-  { role: 'مسؤول', username: 'magwait', password: '@mg2208!QAZ' },
-  { role: 'مشرف', username: 'lateef74', password: '@LAT12345678' },
-  { role: 'مشرف', username: 'hewait18', password: '@MAG12345678' },
-  { role: 'مشرف', username: 'hewait20', password: '@MAG12345678' },
-];
-
 export default function AuthModal({ onLogin, onClose }: Props) {
   const [showPass, setShowPass] = useState(false);
   const [loginError, setLoginError] = useState('');
-  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<FormData>();
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>();
 
   const onSubmit = async (data: FormData) => {
     setLoginError('');

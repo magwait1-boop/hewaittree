@@ -247,7 +247,7 @@ export function getDescendantIds(
   const result = new Set<string>();
   const queue = [id];
   while (queue.length > 0) {
-    let curr = queue.shift()!;
+    const curr = queue.shift()!;
     const children = childrenMap.get(curr) || [];
     for (const c of children) {
       result.add(c);
@@ -256,10 +256,3 @@ export function getDescendantIds(
   }
   return result;
 }
-
-export const SYSTEM_USERS: Record<string, { role: 'admin' | 'supervisor'; pass: string }> = {
-  magwait:  { role: 'admin',      pass: '@mg2208!QAZ' },
-  lateef74: { role: 'supervisor', pass: '@LAT12345678' },
-  hewait18: { role: 'supervisor', pass: '@MAG12345678' },
-  hewait20: { role: 'supervisor', pass: '@MAG12345678' },
-};

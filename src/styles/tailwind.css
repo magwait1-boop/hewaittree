@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: dark;
   --background: #0f172a;
   --foreground: #e2e8f0;
   --primary: #10b981;
@@ -15,7 +16,7 @@
   --accent: #10b981;
   --accent-foreground: #ffffff;
   --muted: #1e293b;
-  --muted-foreground: #64748b;
+  --muted-foreground: #94a3b8;
   --card: rgba(15, 23, 42, 0.85);
   --card-foreground: #e2e8f0;
   --border: rgba(255, 255, 255, 0.12);
@@ -32,8 +33,73 @@
   --gold: #e1d019;
   --text-main: #e2e8f0;
   --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-dim: #94a3b8;
   --sidebar-width: 360px;
+  --primary-button: #047857;
+  --danger-button: #b91c1c;
+  --glass-sidebar: rgba(10, 18, 38, 0.97);
+  --glass-modal: rgba(15, 23, 42, 0.98);
+  --glass-hover: rgba(255, 255, 255, 0.15);
+  --surface-inset: rgba(0, 0, 0, 0.3);
+  --settings-surface: rgba(0, 0, 0, 0.25);
+  --surface-solid: #0f172a;
+  --subtle-surface: rgba(255, 255, 255, 0.06);
+  --subtle-border: rgba(255, 255, 255, 0.08);
+  --canvas-center: #1e293b;
+  --canvas-edge: #0f172a;
+  --canvas-grid: rgba(255, 255, 255, 0.04);
+  --canvas-dot: rgba(255, 255, 255, 0.08);
+  --tree-edge: rgba(255, 255, 255, 0.25);
+  --tree-node-border: rgba(255, 255, 255, 0.2);
+  --lineage-text: #a7f3d0;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  --text-blue: #93c5fd;
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+  --background: #f1f5f9;
+  --foreground: #172033;
+  --primary: #047857;
+  --primary-hover: #065f46;
+  --secondary: #e2e8f0;
+  --secondary-foreground: #475569;
+  --accent: #047857;
+  --muted: #e2e8f0;
+  --muted-foreground: #526176;
+  --card: rgba(255, 255, 255, 0.94);
+  --card-foreground: #172033;
+  --border: rgba(15, 23, 42, 0.18);
+  --input: rgba(255, 255, 255, 0.94);
+  --ring: #047857;
+  --glass-bg: rgba(15, 23, 42, 0.045);
+  --glass-border: rgba(15, 23, 42, 0.16);
+  --glass-panel: rgba(255, 255, 255, 0.94);
+  --glass-sidebar: rgba(248, 250, 252, 0.98);
+  --glass-modal: rgba(255, 255, 255, 0.98);
+  --glass-hover: rgba(15, 23, 42, 0.09);
+  --surface-inset: rgba(255, 255, 255, 0.85);
+  --settings-surface: rgba(255, 255, 255, 0.72);
+  --surface-solid: #ffffff;
+  --subtle-surface: rgba(15, 23, 42, 0.045);
+  --subtle-border: rgba(15, 23, 42, 0.12);
+  --danger: #b91c1c;
+  --danger-hover: #991b1b;
+  --warning: #a16207;
+  --gold: #8a6a08;
+  --text-main: #172033;
+  --text-muted: #475569;
+  --text-dim: #526176;
+  --canvas-center: #ffffff;
+  --canvas-edge: #e2e8f0;
+  --canvas-grid: rgba(15, 23, 42, 0.08);
+  --canvas-dot: rgba(15, 23, 42, 0.16);
+  --tree-edge: #64748b;
+  --tree-node-border: #64748b;
+  --lineage-text: #065f46;
+  --scrollbar-thumb: rgba(15, 23, 42, 0.25);
+  --text-blue: #1d4ed8;
+  --branch-badge-text: #172033;
 }
 
 @layer base {
@@ -59,6 +125,10 @@
   input, select, textarea, button {
     font-family: var(--font-sans);
   }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
 }
 
 @layer utilities {
@@ -76,13 +146,13 @@
     border-bottom: 1px solid var(--glass-border);
   }
   .glass-sidebar {
-    background: rgba(10, 18, 38, 0.97);
+    background: var(--glass-sidebar);
     backdrop-filter: blur(25px);
     -webkit-backdrop-filter: blur(25px);
     border-right: 1px solid var(--glass-border);
   }
   .glass-modal {
-    background: rgba(15, 23, 42, 0.98);
+    background: var(--glass-modal);
     backdrop-filter: blur(30px);
     -webkit-backdrop-filter: blur(30px);
     border: 1px solid var(--glass-border);
@@ -105,7 +175,7 @@
     white-space: nowrap;
   }
   .btn-base:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--glass-hover);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   }
@@ -113,20 +183,20 @@
     transform: translateY(0) scale(0.97);
   }
   .btn-primary {
-    background: var(--primary);
+    background: var(--primary-button);
     border-color: var(--primary-hover);
     color: white;
   }
   .btn-primary:hover {
-    background: var(--primary-hover);
+    background: #065f46;
   }
   .btn-danger {
-    background: var(--danger);
+    background: var(--danger-button);
     border-color: var(--danger-hover);
     color: white;
   }
   .btn-danger:hover {
-    background: var(--danger-hover);
+    background: #991b1b;
   }
   .btn-ghost {
     background: transparent;
@@ -137,7 +207,7 @@
     background: rgba(16, 185, 129, 0.1);
   }
   .info-card {
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--surface-inset);
     padding: 14px;
     border-radius: 12px;
     border: 1px solid var(--glass-border);
@@ -147,18 +217,18 @@
     justify-content: space-between;
     align-items: center;
     padding: 8px 0;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+    border-bottom: 1px dashed var(--subtle-border);
   }
   .info-row:last-child {
     border-bottom: none;
   }
   .info-label {
-    color: #94a3b8;
+    color: var(--text-muted);
     font-size: 13px;
     font-weight: 500;
   }
   .info-value {
-    color: #fff;
+    color: var(--text-main);
     font-weight: 700;
     font-size: 14px;
     text-align: left;
@@ -170,7 +240,7 @@
     padding: 12px;
     font-size: 13px;
     line-height: 1.8;
-    color: #a7f3d0;
+    color: var(--lineage-text);
     direction: rtl;
     word-break: break-word;
   }
@@ -214,18 +284,18 @@
     to { opacity: 1; transform: scale(1); }
   }
   .bg-default-canvas {
-    background: radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%);
+    background: radial-gradient(circle at 50% 50%, var(--canvas-center) 0%, var(--canvas-edge) 100%);
   }
   .bg-grid-canvas {
-    background-color: #0f172a;
+    background-color: var(--canvas-edge);
     background-image:
-      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      linear-gradient(var(--canvas-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px);
     background-size: 30px 30px;
   }
   .bg-dots-canvas {
-    background-color: #0f172a;
-    background-image: radial-gradient(rgba(255,255,255,0.08) 1.5px, transparent 1.5px);
+    background-color: var(--canvas-edge);
+    background-image: radial-gradient(var(--canvas-dot) 1.5px, transparent 1.5px);
     background-size: 25px 25px;
   }
   .zoom-btn {
@@ -234,7 +304,7 @@
     border-radius: 50%;
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
-    color: white;
+    color: var(--text-main);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -244,7 +314,7 @@
     font-weight: 700;
   }
   .zoom-btn:hover {
-    background: rgba(255,255,255,0.18);
+    background: var(--glass-hover);
     transform: scale(1.1);
   }
   .badge-pending {
@@ -266,10 +336,10 @@
     gap: 8px;
     align-items: center;
     padding: 10px 0;
-    border-bottom: 1px dashed rgba(255,255,255,0.08);
+    border-bottom: 1px dashed var(--subtle-border);
   }
   .settings-section {
-    background: rgba(0,0,0,0.25);
+    background: var(--settings-surface);
     border: 1px solid var(--glass-border);
     border-radius: 14px;
     padding: 20px;
@@ -321,7 +391,7 @@
     color: var(--text-muted);
   }
   .nav-item-settings:hover {
-    background: rgba(255,255,255,0.06);
+    background: var(--subtle-surface);
     color: var(--text-main);
   }
   .nav-item-settings.active {
@@ -331,7 +401,7 @@
   }
   .custom-input {
     width: 100%;
-    background: rgba(255,255,255,0.06);
+    background: var(--input);
     border: 1px solid var(--glass-border);
     border-radius: 10px;
     padding: 10px 14px;
@@ -343,7 +413,7 @@
   }
   .custom-input:focus {
     border-color: var(--primary);
-    background: rgba(255,255,255,0.09);
+    background: var(--input);
   }
   .custom-input::placeholder {
     color: var(--text-dim);
@@ -354,7 +424,7 @@
   }
   .custom-select {
     width: 100%;
-    background: rgba(255,255,255,0.06);
+    background: var(--input);
     border: 1px solid var(--glass-border);
     border-radius: 10px;
     padding: 10px 14px;
@@ -368,8 +438,8 @@
     border-color: var(--primary);
   }
   .custom-select option {
-    background: #1e293b;
-    color: #e2e8f0;
+    background: var(--surface-solid);
+    color: var(--text-main);
   }
   .toggle-switch {
     position: relative;
@@ -385,7 +455,7 @@
   .toggle-slider {
     position: absolute;
     inset: 0;
-    background: rgba(255,255,255,0.15);
+    background: var(--scrollbar-thumb);
     border-radius: 24px;
     cursor: pointer;
     transition: 0.3s;
@@ -434,12 +504,12 @@
   }
   .role-admin {
     background: rgba(225,208,25,0.2);
-    color: #e1d019;
+    color: var(--gold);
     border: 1px solid rgba(225,208,25,0.4);
   }
   .role-supervisor {
     background: rgba(16,185,129,0.15);
-    color: #10b981;
+    color: var(--primary);
     border: 1px solid rgba(16,185,129,0.3);
   }
   .tree-canvas-wrap {
@@ -449,7 +519,7 @@
     cursor: grab;
   }
   .family-tree {
-    --tree-controls-height: 164px;
+    --tree-controls-height: 224px;
     height: 100dvh;
   }
   .tree-search-input::-webkit-search-cancel-button {
@@ -462,7 +532,7 @@
     width: 44px;
     height: 44px;
     border-radius: 12px;
-    color: #a7f3d0;
+    color: var(--lineage-text);
     transition: background-color 0.15s;
   }
   .search-step-button:hover:not(:disabled) {
@@ -499,10 +569,10 @@
     max-height: calc(100% - var(--tree-controls-height) - 16px);
     padding-bottom: env(safe-area-inset-bottom);
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid var(--glass-border);
     border-bottom: 0;
     border-radius: 24px 24px 0 0;
-    background: #0f172a;
+    background: var(--surface-solid);
     box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.25);
     animation: personDetailsEnter 0.2s ease-out;
   }
@@ -573,14 +643,14 @@
     pointer-events: none;
   }
   .pending-request-card {
-    background: rgba(255,255,255,0.04);
+    background: var(--subtle-surface);
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     padding: 14px;
     margin-bottom: 10px;
   }
   .stat-pill {
-    background: rgba(255,255,255,0.06);
+    background: var(--subtle-surface);
     border: 1px solid var(--glass-border);
     border-radius: 20px;
     padding: 4px 12px;
@@ -599,8 +669,26 @@
   }
   .scrollbar-thin::-webkit-scrollbar { width: 4px; }
   .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+  .theme-toggle { min-height: 44px; min-width: 124px; flex-shrink: 0; justify-content: center; }
+  .theme-show-light { display: none; }
+  html[data-theme='light'] .theme-show-light { display: inline-flex; }
+  html[data-theme='light'] .theme-show-dark { display: none; }
+  @media (max-width: 1023px) {
+    .family-tree > header .theme-toggle { width: 44px; min-width: 44px; padding: 0; }
+    .family-tree > header .theme-toggle :is(.theme-show-dark, .theme-show-light) > span { display: none; }
+  }
 }
+
+/* Existing translucent utilities follow the theme without changing overlays or node colours. */
+.theme-changing *, .theme-changing *::before, .theme-changing *::after { transition: none !important; }
+html[data-theme='light'] :is([class~='border-white/5'], [class~='border-white/10'], [class~='border-white/15'], [class~='border-white/20']) { border-color: var(--glass-border); }
+html[data-theme='light'] :is([class~='bg-white/5'], [class~='bg-white/10'], [class~='bg-white/25'], [class~='bg-black/20']) { background-color: var(--subtle-surface); }
+html[data-theme='light'] :is([class~='hover:bg-white/03'], [class~='hover:bg-white/5'], [class~='hover:bg-white/06'], [class~='hover:bg-white/10']):hover { background-color: var(--glass-hover); }
+html[data-theme='light'] :is([class~='text-emerald-300'], [class~='text-emerald-400'], [class~='text-green-300'], [class~='text-green-400']) { color: var(--primary); }
+html[data-theme='light'] :is([class~='text-red-300'], [class~='text-red-400']) { color: var(--danger); }
+html[data-theme='light'] [class~='text-blue-300'] { color: var(--text-blue); }
+html[data-theme='light'] [class~='text-pink-300'] { color: #9d174d; }
 
 /* Page dimensions are measured from the complete SVG in TreeCanvas. */
 @media print {

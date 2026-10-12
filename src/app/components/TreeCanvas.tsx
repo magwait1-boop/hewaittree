@@ -1,15 +1,17 @@
 'use client';
-import React, { useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useRef, useCallback, useEffect, useLayoutEffect, useState, useMemo } from 'react';
 import type { Person, AppSettings } from '@/lib/familyData';
 import { getGeneration } from '@/lib/familyData';
 import type { ViewState } from './FamilyTreeClient';
 import { measurePrintBounds, getPrintPageSize, type PrintBounds } from '@/lib/treePrint';
+import { clampTreeZoom, DEFAULT_MIN_ZOOM, getGenerationOverride, getNodeDimensions as measureNodeDimensions, getNodeBounds, intersectsViewport } from '@/lib/treeViewport';
 
 interface Props {
   persons: Person[];
   view: ViewState;
   setView: React.Dispatch<React.SetStateAction<ViewState>>;
   settings: AppSettings;
+  minZoom?: number;
   searchMatches: string[];
   selectedIds: Set<string>;
   sidebarNodeId: string | null;
@@ -60,19 +62,11 @@ function capturePointer(element: SVGElement, pointerId: number) {
   }
 }
 
-function getGenerationOverride(settings: AppSettings, generation: number) {
-  const overrides = settings.generationOverrides;
-  if (!overrides) return null;
-  // Object keys become strings in JSON/JSONB; normalize lookup by generation
-  // number so either representation (including "10") resolves identically.
-  return overrides[generation] ?? Object.entries(overrides).find(([key]) => Number(key) === generation)?.[1] ?? null;
-}
-
 export default function TreeCanvas({
-  persons, view, setView, settings,
+  persons, view, setView, settings, minZoom = DEFAULT_MIN_ZOOM,
   searchMatches, selectedIds, sidebarNodeId,
   onNodeClick, onNodeDblClick, onNodeDrag, onEdgeClick, canEditEdges = false, canDrag,
-  personMap, childrenMap, onBgClick,
+  personMap, onBgClick,
   isPrinting = false, onPrintDone, onPrintReady, printBackground = '#ffffff',
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -116,44 +110,42 @@ export default function TreeCanvas({
     return () => { observer?.disconnect(); window.removeEventListener('resize', update); };
   }, []);
 
-  // Virtual rendering — only draw nodes in viewport + padding
-  const PADDING = 300;
-  const visiblePersons = isPrinting
-    ? persons
-    : persons.filter(p => {
-        const sx = p.manualX * view.scale + view.x;
-        const sy = p.manualY * view.scale + view.y;
-        return sx > -PADDING && sx < canvasSize.w + PADDING &&
-               sy > -PADDING && sy < canvasSize.h + PADDING;
-      });
-
-  const visibleIds = new Set(visiblePersons.map(p => p.id));
-
-  const visibleEdges = persons.filter(p => {
-    if (!p.fatherId) return false;
-    return visibleIds.has(p.id) || visibleIds.has(p.fatherId);
-  });
-
   const getGenOverride = useCallback((p: Person) => {
     const gen = getGeneration(p.id, personMap);
     return getGenerationOverride(settings, gen);
-  }, [settings.generationOverrides, personMap]);
+  }, [settings, personMap]);
 
-  const getNodeDimensions = useCallback((p: Person) => {
-    const genOverride = getGenOverride(p);
-    // Generation settings are applied after the node-specific defaults so a
-    // generation-wide change also reaches nodes with saved per-node styling.
-    const baseFontSize = genOverride?.fontSize ?? p.cardFontSize ?? settings.baseFontSize;
-    const scale = genOverride?.scale ?? p.nodeScale ?? 1;
-    const fs = baseFontSize * scale;
-    const w = Math.max(0, p.cardWidth
-      ? p.cardWidth * scale
-      : Math.max(50 * scale, p.name.length * baseFontSize * 0.55 * scale + 20 * scale));
-    const h = Math.max(0, p.cardHeight
-      ? p.cardHeight * scale
-      : (baseFontSize + 20) * scale);
-    return { w, h, fs, scale };
-  }, [settings.baseFontSize, getGenOverride]);
+  const nodeDimensions = useMemo(() => new Map(persons.map(person => [
+    person.id, measureNodeDimensions(person, settings, personMap),
+  ])), [persons, settings, personMap]);
+  const getNodeDimensions = useCallback((p: Person) => nodeDimensions.get(p.id) ?? measureNodeDimensions(p, settings, personMap), [nodeDimensions, settings, personMap]);
+
+  const safeZoom = clampTreeZoom(view.scale, minZoom);
+  const safePanX = Number.isFinite(view.x) ? Math.round(view.x) : 0;
+  const safePanY = Number.isFinite(view.y) ? Math.round(view.y) : 0;
+  const drawingView = { x: safePanX, y: safePanY, scale: safeZoom };
+
+  // Test the entire card/label, not just its center. The same sanitized view
+  // drives culling and the SVG transform, including zoom levels below 20%.
+  const visiblePersons = isPrinting ? persons : persons.filter(person =>
+    intersectsViewport(getNodeBounds(person, getNodeDimensions(person)), drawingView, canvasSize));
+  const visibleIds = new Set(visiblePersons.map(person => person.id));
+  const visibleEdges = persons.filter(child => {
+    if (!child.fatherId) return false;
+    if (isPrinting || visibleIds.has(child.id) || visibleIds.has(child.fatherId)) return true;
+    const parent = personMap.get(child.fatherId);
+    if (!parent) return false;
+    const fromY = parent.manualY + getNodeDimensions(parent).h / 2;
+    const toY = child.manualY - getNodeDimensions(child).h / 2;
+    // Every existing line style stays inside the bounds of its endpoints.
+    // Keep an edge crossing the viewport even when both cards are offscreen.
+    return intersectsViewport({
+      left: Math.min(parent.manualX, child.manualX),
+      right: Math.max(parent.manualX, child.manualX),
+      top: Math.min(fromY, toY), bottom: Math.max(fromY, toY),
+      width: Math.abs(child.manualX - parent.manualX), height: Math.abs(toY - fromY),
+    }, drawingView, canvasSize);
+  });
 
   const getShape = useCallback((p: Person): 'rect' | 'pill' | 'ellipse' => {
     if (p.gender === 'ذكر') return settings.maleShape;
@@ -185,12 +177,12 @@ export default function TreeCanvas({
       const factor = e.deltaY > 0 ? 0.9 : 1.1;
       const rawScale = currentScale * factor;
       if (!Number.isFinite(rawScale)) return { x: currentX, y: currentY, scale: currentScale };
-      const ns = Math.max(0.2, Math.min(3, rawScale));
+      const ns = clampTreeZoom(rawScale, minZoom);
       const x = clientX - xs * ns;
       const y = clientY - ys * ns;
       return Number.isFinite(x) && Number.isFinite(y) ? { x, y, scale: ns } : { x: currentX, y: currentY, scale: currentScale };
     });
-  }, [setView]);
+  }, [setView, minZoom]);
 
   // Attach wheel zoom natively so the listener is explicitly non-passive.
   // Touch interactions use pointer events and CSS touch-action only.
@@ -303,7 +295,7 @@ export default function TreeCanvas({
         const panY = Number.isFinite(v.y) ? v.y : 0;
         const rawScale = scale * ratio;
         if (!Number.isFinite(rawScale)) return { x: panX, y: panY, scale };
-        const nextScale = Math.min(Math.max(rawScale, 0.2), 3);
+        const nextScale = clampTreeZoom(rawScale, minZoom);
         const x = currentX - ((previousX - panX) / scale) * nextScale;
         const y = currentY - ((previousY - panY) / scale) * nextScale;
         return Number.isFinite(x) && Number.isFinite(y)
@@ -329,7 +321,7 @@ export default function TreeCanvas({
       const y = panStart.current.vy + (e.clientY - panStart.current.y);
       if (Number.isFinite(x) && Number.isFinite(y)) setView(v => ({ ...v, x, y }));
     }
-  }, [view.scale, onNodeDrag, setView]);
+  }, [view.scale, onNodeDrag, setView, minZoom]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     if (!activePointers.current.has(e.pointerId)) return;
@@ -378,8 +370,8 @@ export default function TreeCanvas({
   }, []);
 
   const renderEdgePath = (parent: Person, child: Person): string => {
-    const { w: pw, h: ph } = getNodeDimensions(parent);
-    const { w: cw, h: ch } = getNodeDimensions(child);
+    const { h: ph } = getNodeDimensions(parent);
+    const { h: ch } = getNodeDimensions(child);
     const fx = parent.manualX;
     const fy = parent.manualY + ph / 2;
     const nx = child.manualX;
@@ -434,9 +426,6 @@ export default function TreeCanvas({
     return () => window.removeEventListener('afterprint', handleAfterPrint);
   }, [isPrinting]);
 
-  const safeZoom = Math.min(Math.max(Number.isFinite(view.scale) ? view.scale : 1, 0.2), 3.0);
-  const safePanX = Number.isFinite(view.x) ? Math.round(view.x) : 0;
-  const safePanY = Number.isFinite(view.y) ? Math.round(view.y) : 0;
   const transformStr = `translate(${safePanX}, ${safePanY}) scale(${safeZoom})`;
   const drawingScale = isPrinting ? 1 : safeZoom;
   const whitePaper = printBackground === '#ffffff';
@@ -490,7 +479,7 @@ export default function TreeCanvas({
             const parent = personMap.get(child.fatherId);
             if (!parent) return null;
             const d = renderEdgePath(parent, child);
-            const strokeColor = child.edgeColor || (isPrinting && whitePaper ? '#475569' : 'rgba(255,255,255,0.25)');
+            const strokeColor = child.edgeColor || (isPrinting && whitePaper ? '#475569' : 'var(--tree-edge)');
             return (
               <g key={`edge-${child.id}`}>
                 {!isPrinting && <path
@@ -533,7 +522,7 @@ export default function TreeCanvas({
             const isDescendant = !isPrinting && selectedIds.has(p.id);
             const isRoot = !p.fatherId;
 
-            let strokeColor = isPrinting && whitePaper ? '#64748b' : 'rgba(255,255,255,0.2)';
+            let strokeColor = isPrinting && whitePaper ? '#64748b' : 'var(--tree-node-border)';
             let strokeWidth = 1 / drawingScale;
             let filterAttr = 'url(#shadow)';
 
@@ -597,7 +586,7 @@ export default function TreeCanvas({
         <text
           x={canvasSize.w / 2} y={canvasSize.h / 2}
           textAnchor="middle"
-          fill="rgba(255,255,255,0.2)"
+          fill="var(--muted-foreground)"
           fontSize={18}
           fontFamily="Tajawal, sans-serif"
         >

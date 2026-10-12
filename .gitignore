@@ -4,6 +4,7 @@ package-lock.json
 
 # Next.js build output
 .next/
+.next-*/
 out/
 
 # Production build
@@ -35,3 +36,7 @@ jest-test-results.json
 
 # Optional: if using TurboRepo or monorepo
 turbo/
+
+# Local verification artifacts and Supabase CLI cache
+work/
+supabase/.temp/

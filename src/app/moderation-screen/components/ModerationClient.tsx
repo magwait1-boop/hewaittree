@@ -7,6 +7,7 @@ import {
   type Person, type PendingRequest,
 } from '@/lib/familyData';
 import AppLogo from '@/components/ui/AppLogo';
+import ThemeToggle from '@/app/components/ThemeToggle';
 import { useFamilySession } from '@/contexts/FamilySessionContext';
 import { fetchAllPersons, upsertPerson, deletePerson } from '@/lib/famNodeService';
 import { fetchPendingRequests, updateRequestStatus } from '@/lib/famRequestService';
@@ -14,6 +15,7 @@ import { createClient } from '@/lib/supabase/client';
 
 const TYPE_LABELS: Record<string, string> = { add: 'إضافة', edit: 'تعديل', delete: 'حذف' };
 const TYPE_COLORS: Record<string, string> = { add: '#10b981', edit: '#f59e0b', delete: '#ef4444' };
+const TYPE_TEXT_COLORS: Record<string, string> = { add: 'var(--primary)', edit: 'var(--warning)', delete: 'var(--danger)' };
 const TYPE_ICONS: Record<string, string> = { add: '➕', edit: '✏️', delete: '🗑️' };
 
 type FilterType = 'all' | 'add' | 'edit' | 'delete';
@@ -27,7 +29,7 @@ export default function ModerationClient() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ reqId: string; action: 'approve' | 'reject' } | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
+  const [, setLastUpdated] = useState<number>(Date.now());
 
   const loadData = useCallback(async () => {
     if (!canReview) return;
@@ -102,7 +104,7 @@ export default function ModerationClient() {
       }
     } else if (req.type === 'delete' && req.targetId) {
       setPersons(prev => {
-        let updated = prev
+        const updated = prev
           .filter(p => p.id !== req.targetId)
           .map(p => p.fatherId === req.targetId ? { ...p, fatherId: '' } : p);
         localStorage.setItem('fam_nodes_backup', JSON.stringify(updated));
@@ -111,7 +113,7 @@ export default function ModerationClient() {
       });
     }
     setPendingRequests(prev => {
-      let updated = prev.filter(r => r.reqId !== reqId);
+      const updated = prev.filter(r => r.reqId !== reqId);
       localStorage.setItem('fam_requests', JSON.stringify(updated));
       window.dispatchEvent(new Event('fam_requests_changed'));
       return updated;
@@ -128,7 +130,7 @@ export default function ModerationClient() {
       return;
     }
     setPendingRequests(prev => {
-      let updated = prev.filter(r => r.reqId !== reqId);
+      const updated = prev.filter(r => r.reqId !== reqId);
       localStorage.setItem('fam_requests', JSON.stringify(updated));
       window.dispatchEvent(new Event('fam_requests_changed'));
       return updated;
@@ -164,7 +166,7 @@ export default function ModerationClient() {
   return (
     <div className="min-h-screen bg-default-canvas" style={{ direction: 'rtl' }}>
       {/* Header */}
-      <header className="glass-panel no-print sticky top-0 z-30 h-14 flex items-center px-4 gap-3">
+      <header className="glass-panel no-print sticky top-0 z-30 min-h-14 flex flex-wrap items-center px-3 py-2 sm:px-4 gap-2 sm:gap-3">
         <Link href="/" className="flex items-center gap-2 flex-shrink-0 hover:opacity-80 transition-opacity">
           <AppLogo size={32} />
           <span className="font-sans font-black text-sm md:text-base text-foreground leading-tight hidden sm:block">
@@ -174,6 +176,7 @@ export default function ModerationClient() {
         </Link>
         <div className="flex-1" />
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <span className="text-xs font-bold text-muted-foreground hidden md:flex items-center gap-1">
             🛡️ لوحة المراجعة
           </span>
@@ -225,10 +228,10 @@ export default function ModerationClient() {
             {/* Stats Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               {[
-                { label: 'إجمالي الطلبات', value: stats.total, color: '#e2e8f0', icon: '📋' },
-                { label: 'طلبات إضافة', value: stats.add, color: '#10b981', icon: '➕' },
-                { label: 'طلبات تعديل', value: stats.edit, color: '#f59e0b', icon: '✏️' },
-                { label: 'طلبات حذف', value: stats.delete, color: '#ef4444', icon: '🗑️' },
+                { label: 'إجمالي الطلبات', value: stats.total, color: 'var(--text-main)', icon: '📋' },
+                { label: 'طلبات إضافة', value: stats.add, color: 'var(--primary)', icon: '➕' },
+                { label: 'طلبات تعديل', value: stats.edit, color: 'var(--warning)', icon: '✏️' },
+                { label: 'طلبات حذف', value: stats.delete, color: 'var(--danger)', icon: '🗑️' },
               ].map(stat => (
                 <div key={stat.label} className="glass rounded-xl p-4 text-center">
                   <div className="text-2xl mb-1">{stat.icon}</div>
@@ -247,8 +250,8 @@ export default function ModerationClient() {
                     onClick={() => setFilter(f)}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                     style={filter === f
-                      ? { background: '#10b981', color: 'white' }
-                      : { color: '#64748b' }
+                      ? { background: 'var(--primary-button)', color: 'white' }
+                      : { color: 'var(--text-muted)' }
                     }
                   >
                     {f === 'all' ? `الكل (${stats.total})` :
@@ -303,7 +306,7 @@ export default function ModerationClient() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span
                               className="text-xs font-black px-2 py-0.5 rounded-full"
-                              style={{ background: `${TYPE_COLORS[req.type]}22`, color: TYPE_COLORS[req.type], border: `1px solid ${TYPE_COLORS[req.type]}44` }}
+                              style={{ background: `${TYPE_COLORS[req.type]}22`, color: TYPE_TEXT_COLORS[req.type], border: `1px solid ${TYPE_COLORS[req.type]}44` }}
                             >
                               {TYPE_LABELS[req.type]}
                             </span>

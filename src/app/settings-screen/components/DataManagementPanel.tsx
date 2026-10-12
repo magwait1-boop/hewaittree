@@ -161,7 +161,7 @@ export default function DataManagementPanel({ onReset, onImport, onExportCSV, on
 
       {/* Supabase Sync Status */}
       <div className="settings-section" style={{ borderColor: 'rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.05)' }}>
-        <span className="settings-label" style={{ color: '#10b981' }}>🗄 قاعدة البيانات المركزية</span>
+        <span className="settings-label" style={{ color: 'var(--primary)' }}>🗄 قاعدة البيانات المركزية</span>
         <div className="space-y-2 mt-2">
           <div className="info-row">
             <span className="info-label">المزود</span>
@@ -287,7 +287,7 @@ export default function DataManagementPanel({ onReset, onImport, onExportCSV, on
 
       {/* Danger Zone */}
       {permissions.can_style && <div className="settings-section" style={{ borderColor: 'rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
-        <span className="settings-label" style={{ color: '#ef4444' }}>منطقة الخطر</span>
+        <span className="settings-label" style={{ color: 'var(--danger)' }}>منطقة الخطر</span>
         <p className="text-xs text-muted-foreground mb-3">
           هذه الإجراءات لا يمكن التراجع عنها — تأكد قبل المتابعة
         </p>

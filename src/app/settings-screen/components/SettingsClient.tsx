@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
+import ThemeToggle from '@/app/components/ThemeToggle';
 import { DEFAULT_SETTINGS, LOCAL_SETTINGS_PENDING_KEY, type AppSettings, type Person } from '@/lib/familyData';
 import { fetchSettings, saveSettings, fetchAllPersons, replaceAllPersons } from '@/lib/famNodeService';
 import { createClient } from '@/lib/supabase/client';
@@ -25,7 +25,6 @@ const NAV_ITEMS: { id: SettingsTab; label: string; icon: string; desc: string }[
 ];
 
 export default function SettingsClient() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -57,13 +56,13 @@ export default function SettingsClient() {
         } else {
           const saved = localStorage.getItem('fam_settings');
           if (saved) {
-            try { setSettings(normalizeSettings(JSON.parse(saved))); } catch {}
+            try { setSettings(normalizeSettings(JSON.parse(saved))); } catch { /* Keep defaults for invalid cached settings. */ }
           }
         }
       } catch {
         const saved = localStorage.getItem('fam_settings');
         if (saved) {
-          try { setSettings(normalizeSettings(JSON.parse(saved))); } catch {}
+          try { setSettings(normalizeSettings(JSON.parse(saved))); } catch { /* Keep defaults for invalid cached settings. */ }
         }
       } finally {
         setIsLoading(false);
@@ -202,6 +201,7 @@ export default function SettingsClient() {
           </div>
         </div>
         <div className="mr-auto flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto sm:gap-3">
+          <ThemeToggle />
           {isLoading && (
             <span className="mr-auto text-xs text-muted-foreground animate-pulse">جارٍ التحميل...</span>
           )}
@@ -348,7 +348,7 @@ export default function SettingsClient() {
                   localStorage.setItem('fam_settings', JSON.stringify(restored));
                 } else {
                   const saved = localStorage.getItem('fam_settings');
-                  if (saved) { try { setSettings(JSON.parse(saved)); } catch {} }
+                  if (saved) { try { setSettings(JSON.parse(saved)); } catch { /* Retain the current settings if the cache is invalid. */ } }
                 }
                 localStorage.removeItem(LOCAL_SETTINGS_PENDING_KEY);
                 setHasChanges(false);
@@ -368,9 +368,9 @@ export default function SettingsClient() {
         position="bottom-right"
         toastOptions={{
           style: {
-            background: 'rgba(15,23,42,0.98)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            color: '#e2e8f0',
+            background: 'var(--glass-modal)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--text-main)',
             fontFamily: 'Tajawal, sans-serif',
             direction: 'rtl',
           },
