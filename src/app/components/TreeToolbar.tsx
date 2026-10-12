@@ -40,7 +40,7 @@ export default function TreeToolbar({
 
   return (
     <div
-      className="glass-panel no-print absolute top-14 left-0 right-0 z-30 flex flex-col sm:h-12 sm:flex-row sm:items-center sm:gap-3 sm:px-4"
+      className="glass-panel no-print absolute top-28 left-0 right-0 z-30 flex flex-col sm:top-14 sm:h-12 sm:flex-row sm:items-center sm:gap-3 sm:px-4"
       style={{ direction: 'rtl' }}>
 
       <form
@@ -68,7 +68,7 @@ export default function TreeToolbar({
             aria-describedby="tree-search-count"
             autoComplete="off"
             enterKeyHint="search"
-            className="tree-search-input h-12 w-full min-w-0 rounded-xl border border-white/15 bg-slate-950/50 py-3 pl-12 pr-10 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 sm:h-10 sm:py-2"
+            className="tree-search-input h-12 w-full min-w-0 rounded-xl border border-border bg-input py-3 pl-12 pr-10 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 sm:h-10 sm:py-2"
           />
           {searchQuery && (
             <button

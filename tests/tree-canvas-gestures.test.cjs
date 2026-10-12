@@ -5,6 +5,16 @@ const test = require('node:test');
 const React = require('react');
 const ts = require('typescript');
 
+const viewportSource = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/treeViewport.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS },
+}).outputText;
+const viewportModule = { exports: {} };
+new Function('require', 'module', 'exports', viewportSource)(name => {
+  if (name === './familyData') return { getGeneration: () => 1 };
+  return require(name);
+}, viewportModule, viewportModule.exports);
+const viewportHelpers = viewportModule.exports;
+
 const file = path.join(__dirname, '../src/app/components/TreeCanvas.tsx');
 const { outputText } = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
   compilerOptions: {
@@ -22,6 +32,7 @@ function createCanvas(overrides = {}) {
     useRef: current => ({ current }),
     useState: initial => [initial, () => {}],
     useCallback: callback => callback,
+    useMemo: callback => callback(),
     useEffect: () => {},
     useLayoutEffect: () => {},
   };
@@ -30,6 +41,7 @@ function createCanvas(overrides = {}) {
     if (name === 'react') return hooks;
     if (name === '@/lib/familyData') return { getGeneration: () => 1 };
     if (name === '@/lib/treePrint') return {};
+    if (name === '@/lib/treeViewport') return viewportHelpers;
     return require(name);
   }, module, module.exports);
   const canvas = module.exports.default({
@@ -155,6 +167,16 @@ test('zoom stays within 0.2 to 3 and invalid previous view values recover', () =
     assert.equal(view.scale, expected);
     assert.ok(Number.isFinite(view.x) && Number.isFinite(view.y));
   }
+});
+
+test('pinch can zoom below 20% for a large tree and stops at the supplied minimum', () => {
+  const { handlers, event, flush } = createCanvas({ minZoom: 0.004 });
+  handlers.onPointerDown(event(1, 100));
+  handlers.onPointerDown(event(2, 200));
+  handlers.onPointerMove(event(2, 160));
+  const view = flush({ x: 20, y: 30, scale: 0.005 });
+  assert.equal(view.scale, 0.004);
+  assert.ok(Number.isFinite(view.x) && Number.isFinite(view.y));
 });
 
 test('cancellation and lost capture clear pinch tracking without firing taps', () => {

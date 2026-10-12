@@ -20,7 +20,7 @@ export default function EdgeStyleModal({ person, onSave, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="edge-style-title"
-        className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-5 text-white shadow-2xl"
+        className="glass-modal w-full max-w-sm p-5 text-foreground shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         <h2 id="edge-style-title" className="mb-4 text-lg font-bold">تخصيص خط الاتصال</h2>
@@ -57,7 +57,7 @@ export default function EdgeStyleModal({ person, onSave, onClose }: Props) {
           تطبيق على كامل الذرية
         </label>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-white/10">إغلاق</button>
+          <button type="button" onClick={onClose} className="btn-base px-4 py-2 text-sm text-muted-foreground">إغلاق</button>
           <button type="button" onClick={() => onSave(color, width, applyToDescendants)} className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-300">حفظ التعديلات</button>
         </div>
       </section>

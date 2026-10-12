@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Fragment } from 'react';
 import { aboutContent, type AboutBlock } from './content';
 import styles from './page.module.css';
+import ThemeToggle from '@/app/components/ThemeToggle';
 
 export const metadata: Metadata = {
   title: 'من نحن | عائلة حويت',
@@ -140,12 +141,15 @@ export default function AboutUsPage() {
             </Link>
             <p className="hidden text-xs text-slate-400 sm:block">وثيقة وفاء وتاريخ</p>
           </div>
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-600/15 px-3 py-2 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-600/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-400 sm:px-4"
-          >
-            <span aria-hidden="true">←</span> العودة إلى الشجرة
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <ThemeToggle />
+            <Link
+              href="/"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-600/15 px-3 py-2 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-600/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-400 sm:px-4"
+            >
+              <span aria-hidden="true">←</span> العودة إلى الشجرة
+            </Link>
+          </div>
         </div>
       </header>
 

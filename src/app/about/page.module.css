@@ -1,6 +1,8 @@
 .page {
+  --about-scrollbar: #78350f;
+  --about-scrollbar-track: #020617;
   scrollbar-width: thin;
-  scrollbar-color: #78350f #020617;
+  scrollbar-color: var(--about-scrollbar) var(--about-scrollbar-track);
   scroll-behavior: smooth;
   overflow-wrap: break-word;
   padding-bottom: env(safe-area-inset-bottom);
@@ -11,13 +13,56 @@
 }
 
 .page::-webkit-scrollbar-track {
-  background: #020617;
+  background: var(--about-scrollbar-track);
 }
 
 .page::-webkit-scrollbar-thumb {
-  border: 2px solid #020617;
+  border: 2px solid var(--about-scrollbar-track);
   border-radius: 6px;
-  background: #78350f;
+  background: var(--about-scrollbar);
+}
+
+:global(html[data-theme='light']) .page {
+  --about-scrollbar: #b45309;
+  --about-scrollbar-track: #fffbf5;
+  background: #fffbf5;
+  color: var(--text-main);
+}
+
+:global(html[data-theme='light']) .page [class~='bg-slate-950/95'] {
+  background-color: rgba(255, 251, 245, 0.95);
+}
+
+:global(html[data-theme='light']) .page [class~='bg-slate-950/50'] {
+  background-color: rgba(255, 255, 255, 0.78);
+}
+
+:global(html[data-theme='light']) .page :is([class~='bg-slate-900/90'], [class~='bg-slate-900/70'], [class~='bg-slate-900/40'], [class~='bg-slate-900']) {
+  background-color: rgba(255, 255, 255, 0.88);
+}
+
+:global(html[data-theme='light']) .page [class~='bg-amber-950/20'] {
+  background-color: rgba(180, 83, 9, 0.055);
+}
+
+:global(html[data-theme='light']) .page [class~='hover:bg-amber-950/40']:hover {
+  background-color: rgba(180, 83, 9, 0.1);
+}
+
+:global(html[data-theme='light']) .page :is([class~='text-slate-300'], [class~='text-slate-400']) {
+  color: var(--text-muted);
+}
+
+:global(html[data-theme='light']) .page [class*='text-amber-'] {
+  color: #92400e;
+}
+
+:global(html[data-theme='light']) .page [class~='border-slate-800'] {
+  border-color: #d6c4aa;
+}
+
+:global(html[data-theme='light']) .page h1 {
+  background-image: linear-gradient(to left, #92400e, #a16207, #b45309);
 }
 
 @media (prefers-reduced-motion: reduce) {

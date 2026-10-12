@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { flushSync } from 'react-dom';
 import { MOCK_PERSONS, DEFAULT_SETTINGS, LOCAL_SETTINGS_PENDING_KEY, buildChildrenMap, buildPersonMap, buildNameIndex, searchPersons, normalizeSettings, type Person, type PendingRequest, type AppSettings,  } from '@/lib/familyData';
 import { useFamilySession } from '@/contexts/FamilySessionContext';
+import { clampTreeZoom, getTreeBounds, getFitView, getMinimumZoom, zoomAtPoint } from '@/lib/treeViewport';
 export type { CurrentUser } from '@/lib/familyPermissions';
 import {
   fetchAllPersons,
@@ -29,6 +30,7 @@ import EdgeStyleModal from './EdgeStyleModal';
 import AdminModal from './AdminModal';
 import AuthModal from './AuthModal';
 import TreeHeader from './TreeHeader';
+import VisitorFeedbackModal from './VisitorFeedbackModal';
 import { Toaster, toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 
@@ -47,8 +49,8 @@ export interface ViewState {
   scale: number;
 }
 
-function sanitizeView(view: ViewState): ViewState {
-  const safeZoom = Math.min(Math.max(Number.isFinite(view.scale) ? view.scale : 1, 0.2), 3.0);
+function sanitizeView(view: ViewState, minZoom: number): ViewState {
+  const safeZoom = clampTreeZoom(view.scale, minZoom);
   const safePanX = Number.isFinite(view.x) ? Math.round(view.x) : 0;
   const safePanY = Number.isFinite(view.y) ? Math.round(view.y) : 0;
   return { x: safePanX, y: safePanY, scale: safeZoom };
@@ -88,16 +90,6 @@ export default function FamilyTreeClient() {
   const [view, setView] = useState<ViewState>({ x: 0, y: 0, scale: 0.18 });
   const [canvasRecoveryKey, setCanvasRecoveryKey] = useState(0);
   const canvasRecoveryAttempted = useRef(false);
-  const setSafeView = useCallback<React.Dispatch<React.SetStateAction<ViewState>>>((next) => {
-    setView(current => sanitizeView(typeof next === 'function' ? next(current) : next));
-  }, []);
-  const recoverCanvas = useCallback(() => {
-    setSafeView({ x: 0, y: 0, scale: 1 });
-    if (!canvasRecoveryAttempted.current) {
-      canvasRecoveryAttempted.current = true;
-      setCanvasRecoveryKey(key => key + 1);
-    }
-  }, [setSafeView]);
   const { currentUser, permissions, signIn, signOut } = useFamilySession();
   const [sidebarNodeId, setSidebarNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,6 +105,7 @@ export default function FamilyTreeClient() {
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [nodeModalParentId, setNodeModalParentId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -139,6 +132,53 @@ export default function FamilyTreeClient() {
     const rect = canvasContainerRef.current?.getBoundingClientRect();
     return { w: Math.max(0, rect?.width ?? 1440), h: Math.max(0, rect?.height ?? 800) };
   }, []);
+  const [canvasSize, setCanvasSize] = useState({ w: 1440, h: 800 });
+  const [hasMeasuredCanvas, setHasMeasuredCanvas] = useState(false);
+  const treeBounds = useMemo(() => getTreeBounds(persons, settings, personMap), [persons, settings, personMap]);
+  const minZoom = useMemo(() => getMinimumZoom(treeBounds, canvasSize), [treeBounds, canvasSize]);
+  const setSafeView = useCallback<React.Dispatch<React.SetStateAction<ViewState>>>((next) => {
+    setView(current => sanitizeView(typeof next === 'function' ? next(current) : next, minZoom));
+  }, [minZoom]);
+  const recoverCanvas = useCallback(() => {
+    setSafeView(getFitView(treeBounds, getCanvasSize()));
+    if (!canvasRecoveryAttempted.current) {
+      canvasRecoveryAttempted.current = true;
+      setCanvasRecoveryKey(key => key + 1);
+    }
+  }, [setSafeView, treeBounds, getCanvasSize]);
+
+  useEffect(() => {
+    const container = canvasContainerRef.current;
+    if (!container) return;
+    const measure = () => {
+      const { width: w, height: h } = container.getBoundingClientRect();
+      if (w <= 0 || h <= 0) return;
+      setCanvasSize(previous => previous.w === w && previous.h === h ? previous : { w, h });
+      setHasMeasuredCanvas(true);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(container);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+
+  // Preserve a fitted tree when the phone rotates or the viewport changes.
+  const previousFit = useRef<ViewState | null>(null);
+  useEffect(() => {
+    const nextFit = getFitView(treeBounds, canvasSize);
+    const oldFit = previousFit.current;
+    previousFit.current = nextFit;
+    if (!oldFit || !initialFitDone.current) return;
+    setSafeView(current => {
+      const wasFitted = Math.abs(current.scale - oldFit.scale) < oldFit.scale * 0.001 &&
+        Math.abs(current.x - oldFit.x) <= 2 && Math.abs(current.y - oldFit.y) <= 2;
+      return wasFitted ? nextFit : current;
+    });
+  }, [treeBounds, canvasSize, setSafeView]);
   const closePersonDetails = useCallback(() => {
     setIsSidebarOpen(false);
     setSidebarNodeId(null);
@@ -161,7 +201,7 @@ export default function FamilyTreeClient() {
           if (isDraggingActiveRef.current) return;
 
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            let updated = fromRowPublic(payload.new);
+            const updated = fromRowPublic(payload.new);
             setPersons(prev => {
               const idx = prev.findIndex(p => p.id === updated.id);
               if (idx >= 0) {
@@ -264,7 +304,7 @@ export default function FamilyTreeClient() {
         } else {
           const savedSettings = localStorage.getItem('fam_settings');
           if (savedSettings) {
-            try { setSettings(normalizeSettings(JSON.parse(savedSettings))); } catch {}
+            try { setSettings(normalizeSettings(JSON.parse(savedSettings))); } catch { /* Ignore malformed cached settings. */ }
           }
         }
 
@@ -277,7 +317,7 @@ export default function FamilyTreeClient() {
         setPersons(loaded);
         const savedSettings = localStorage.getItem('fam_settings');
         if (savedSettings) {
-          try { setSettings(normalizeSettings(JSON.parse(savedSettings))); } catch {}
+          try { setSettings(normalizeSettings(JSON.parse(savedSettings))); } catch { /* Ignore malformed cached settings. */ }
         }
         toast.error('خطأ في تحميل البيانات — يُعرض آخر نسخة محلية');
       } finally {
@@ -304,7 +344,7 @@ export default function FamilyTreeClient() {
       } else {
         const savedSettings = localStorage.getItem('fam_settings');
         if (savedSettings) {
-          try { setSettings(normalizeSettings(JSON.parse(savedSettings))); } catch {}
+          try { setSettings(normalizeSettings(JSON.parse(savedSettings))); } catch { /* Ignore malformed cached settings. */ }
         }
       }
     };
@@ -319,14 +359,14 @@ export default function FamilyTreeClient() {
 
     const handleStorageEvent = (e: StorageEvent) => {
       if (e.key === 'fam_settings' && e.newValue) {
-        try { setSettings(normalizeSettings(JSON.parse(e.newValue))); } catch {}
+        try { setSettings(normalizeSettings(JSON.parse(e.newValue))); } catch { /* Ignore malformed cached settings. */ }
       }
     };
 
     const handleCustomSettingsChange = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail) {
-        try { setSettings(typeof detail === 'string' ? normalizeSettings(JSON.parse(detail)) : normalizeSettings(detail as Record<string, unknown>)); } catch {}
+        try { setSettings(typeof detail === 'string' ? normalizeSettings(JSON.parse(detail)) : normalizeSettings(detail as Record<string, unknown>)); } catch { /* Ignore malformed cached settings. */ }
       } else {
         reloadSettingsFromDB();
       }
@@ -354,22 +394,12 @@ export default function FamilyTreeClient() {
     };
   }, []);
 
-  // Fit to view on initial load
+  // Fit only after the data and actual viewport dimensions are available.
   useEffect(() => {
-    if (persons.length === 0 || initialFitDone.current) return;
+    if (!treeBounds || isLoadingData || !hasMeasuredCanvas || initialFitDone.current) return;
     initialFitDone.current = true;
-    const xs = persons.map(p => p.manualX);
-    const ys = persons.map(p => p.manualY);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const { w: W, h: H } = getCanvasSize();
-    const scaleX = Math.max(0, W - 100) / (Math.max(0, maxX - minX) || 1);
-    const scaleY = Math.max(0, H - 100) / (Math.max(0, maxY - minY) || 1);
-    const s = Math.min(scaleX, scaleY, 0.5);
-    const midX = (minX + maxX) / 2;
-    const midY = (minY + maxY) / 2;
-    setSafeView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
-  }, [persons, setSafeView, getCanvasSize]);
+    setSafeView(getFitView(treeBounds, canvasSize));
+  }, [treeBounds, isLoadingData, hasMeasuredCanvas, canvasSize, setSafeView]);
 
   const centerOnNode = useCallback((id: string, showDetails = false) => {
     const p = personMap.get(id);
@@ -427,21 +457,14 @@ export default function FamilyTreeClient() {
 
   const handleZoomChange = useCallback((zoom: number) => {
     if (!Number.isFinite(zoom)) return;
-    setSafeView(v => ({ ...v, scale: zoom }));
-  }, [setSafeView]);
+    const { w, h } = getCanvasSize();
+    setSafeView(v => zoomAtPoint(v, zoom, { x: w / 2, y: h / 2 }, minZoom));
+  }, [setSafeView, getCanvasSize, minZoom]);
 
   const handleFitToView = useCallback(() => {
-    if (persons.length === 0) return;
-    const xs = persons.map(p => p.manualX);
-    const ys = persons.map(p => p.manualY);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const { w: W, h: H } = getCanvasSize();
-    const s = Math.min(Math.max(0, W - 100) / (Math.max(0, maxX - minX) || 1), Math.max(0, H - 100) / (Math.max(0, maxY - minY) || 1), 0.5);
-    const midX = (minX + maxX) / 2;
-    const midY = (minY + maxY) / 2;
-    setSafeView({ x: W / 2 - midX * s, y: H / 2 - midY * s, scale: s });
-  }, [persons, setSafeView, getCanvasSize]);
+    closePersonDetails();
+    setSafeView(getFitView(treeBounds, getCanvasSize()));
+  }, [treeBounds, setSafeView, getCanvasSize, closePersonDetails]);
 
   const handleLogin = useCallback(async (username: string, password: string) => {
     await signIn(username, password);
@@ -472,7 +495,7 @@ export default function FamilyTreeClient() {
       });
 
       // Persist to Supabase directly
-      let ok = await upsertPerson(data);
+      const ok = await upsertPerson(data);
       if (!ok) {
         toast.error('تحذير: تم الحفظ محلياً فقط — تعذّر الحفظ في قاعدة البيانات');
       } else {
@@ -487,7 +510,7 @@ export default function FamilyTreeClient() {
         createdAt: new Date().toLocaleDateString('ar-EG'),
       };
       // Save to Supabase so admin sees it in real-time
-      let ok = await insertRequest(req);
+      const ok = await insertRequest(req);
       if (ok) {
         toast.success('تم إرسال الطلب للمسؤول للمراجعة');
       } else {
@@ -504,7 +527,7 @@ export default function FamilyTreeClient() {
     if (!permissions.can_delete) return;
     if (currentUser?.role === 'admin') {
       setPersons(prev => {
-        let updated = prev
+        const updated = prev
           .filter(p => p.id !== id)
           .map(p => p.fatherId === id ? { ...p, fatherId: '' } : p);
         localStorage.setItem('fam_nodes_backup', JSON.stringify(updated));
@@ -514,7 +537,7 @@ export default function FamilyTreeClient() {
       setSidebarNodeId(null);
       setIsSidebarOpen(false);
 
-      let ok = await deletePersonFromDB(id);
+      const ok = await deletePersonFromDB(id);
       if (!ok) {
         toast.error('تحذير: تم الحذف محلياً فقط — تعذّر الحذف من قاعدة البيانات');
       } else {
@@ -528,7 +551,7 @@ export default function FamilyTreeClient() {
         by: currentUser.username,
         createdAt: new Date().toLocaleDateString('ar-EG'),
       };
-      let ok = await insertRequest(req);
+      const ok = await insertRequest(req);
       if (ok) {
         toast.success('تم إرسال طلب الحذف للمسؤول');
       } else {
@@ -566,7 +589,7 @@ export default function FamilyTreeClient() {
       }
     } else if (req.type === 'delete' && req.targetId) {
       setPersons(prev => {
-        let updated = prev
+        const updated = prev
           .filter(p => p.id !== req.targetId)
           .map(p => p.fatherId === req.targetId ? { ...p, fatherId: '' } : p);
         localStorage.setItem('fam_nodes_backup', JSON.stringify(updated));
@@ -601,7 +624,7 @@ export default function FamilyTreeClient() {
       : new Set([id]);
 
     setPersons(prev => {
-      let updated = prev.map(p => {
+      const updated = prev.map(p => {
         if (movedIds.has(p.id)) {
           return {
             ...p,
@@ -672,7 +695,7 @@ export default function FamilyTreeClient() {
       } else {
         if (merge) {
           setPersons(prev => {
-            let updated = [...prev, ...data];
+            const updated = [...prev, ...data];
             localStorage.setItem('fam_nodes_backup', JSON.stringify(updated));
             return updated;
           });
@@ -685,7 +708,7 @@ export default function FamilyTreeClient() {
     } else {
       if (merge) {
         setPersons(prev => {
-          let updated = [...prev, ...data];
+          const updated = [...prev, ...data];
           localStorage.setItem('fam_nodes_backup', JSON.stringify(updated));
           return updated;
         });
@@ -821,6 +844,7 @@ export default function FamilyTreeClient() {
         onLoginClick={() => setShowAuthModal(true)}
         onLogout={handleLogout}
         onPrint={handlePrint}
+        onFeedbackClick={() => setShowFeedbackModal(true)}
       />
 
       {/* Toolbar */}
@@ -852,6 +876,7 @@ export default function FamilyTreeClient() {
           <TreeCanvas
             persons={persons}
             view={view}
+            minZoom={minZoom}
             setView={setSafeView}
             settings={settings}
             searchMatches={searchMatches}
@@ -898,9 +923,10 @@ export default function FamilyTreeClient() {
       />
 
       {/* Zoom Controls */}
-      <ZoomControls zoom={view.scale} onZoomChange={handleZoomChange} onFit={handleFitToView} />
+      <ZoomControls minZoom={minZoom} zoom={view.scale} onZoomChange={handleZoomChange} onFit={handleFitToView} />
 
       {/* Modals */}
+      {showFeedbackModal && <VisitorFeedbackModal onClose={() => setShowFeedbackModal(false)} />}
       {showAuthModal && (
         <AuthModal
           onLogin={handleLogin}
@@ -941,9 +967,9 @@ export default function FamilyTreeClient() {
         position="bottom-right"
         toastOptions={{
           style: {
-            background: 'rgba(15,23,42,0.98)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            color: '#e2e8f0',
+            background: 'var(--glass-modal)',
+            border: '1px solid var(--border)',
+            color: 'var(--foreground)',
             fontFamily: 'Tajawal, sans-serif',
             direction: 'rtl',
           },
@@ -954,40 +980,40 @@ export default function FamilyTreeClient() {
         <div
           role="dialog"
           aria-labelledby="tree-print-title"
-          className="no-print fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-sm bg-slate-900/95 backdrop-blur border-2 border-emerald-500/80 p-5 rounded-2xl shadow-2xl flex flex-col gap-4 text-white"
+          className="no-print fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-[calc(100%-2rem)] max-w-sm bg-card backdrop-blur border-2 border-primary p-5 rounded-2xl shadow-2xl flex flex-col gap-4 text-foreground"
         >
           <h3 id="tree-print-title" className="font-bold text-base">🖨️ طباعة كامل الشجرة</h3>
-          <p className="text-sm text-emerald-300">
+          <p className="text-sm text-primary">
             عدد البطاقات في الطباعة: <strong>{persons.length.toLocaleString('ar-EG')}</strong>
           </p>
-          <p className="text-xs text-slate-300 leading-relaxed">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             تشمل المعاينة جميع البطاقات والخطوط. يطابق مقاس الصفحة حدودها من جميع الجهات دون هوامش إضافية.
             تُحفظ النصوص والخطوط بجودة متجهية لعرض التفاصيل عند التكبير أو الحفظ بصيغة PDF.
           </p>
           <div className="space-y-1.5">
-            <label htmlFor="tree-print-background" className="text-xs font-semibold text-slate-300">لون خلفية الطباعة:</label>
+            <label htmlFor="tree-print-background" className="text-xs font-semibold text-muted-foreground">لون خلفية الطباعة:</label>
             <select
               id="tree-print-background"
               value={printBackground}
-              className="w-full bg-slate-800 text-white border border-slate-700 rounded-lg p-2 text-xs focus:outline-none focus:border-emerald-500"
+              className="custom-input text-xs"
               onChange={event => setPrintBackground(event.target.value)}
             >
               <option value="#ffffff">أبيض</option>
               <option value="#0f172a">داكن</option>
             </select>
           </div>
-          <div className="flex gap-2 pt-2 border-t border-slate-700/80">
+          <div className="flex gap-2 pt-2 border-t border-border">
             <button
               type="button"
               disabled={!isPrintReady}
-              className="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 text-xs font-bold py-2 rounded-lg transition-colors"
+              className="btn-base btn-primary flex-1 justify-center text-xs font-bold py-2 disabled:opacity-50"
               onClick={printTree}
             >
               {isPrintReady ? 'طباعة / حفظ PDF' : 'جارٍ تجهيز البطاقات والخطوط…'}
             </button>
             <button
               type="button"
-              className="px-3 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 text-xs font-medium py-2 rounded-lg transition-colors"
+              className="btn-base btn-danger px-3 text-xs py-2"
               onClick={() => setIsPrinting(false)}
             >
               إلغاء

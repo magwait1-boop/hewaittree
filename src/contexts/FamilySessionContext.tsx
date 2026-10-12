@@ -9,7 +9,6 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { SYSTEM_USERS } from '@/lib/familyData';
 import {
   getPermissions,
   type CurrentUser,
@@ -122,11 +121,20 @@ export function FamilySessionProvider({ children }: { children: ReactNode }) {
     async (username: string, password: string) => {
       const generation = ++generationRef.current;
       const normalizedUsername = username.trim();
-      const systemUser = Object.hasOwn(SYSTEM_USERS, normalizedUsername)
-        ? SYSTEM_USERS[normalizedUsername]
-        : undefined;
+      const adminResponse = await fetch('/api/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ username: normalizedUsername, password }),
+      }).catch(() => {
+        throw new Error('تعذر تسجيل الدخول، تحقق من اتصالك وحاول مرة أخرى');
+      });
+      if (!adminResponse.ok && adminResponse.status !== 401) {
+        throw new Error('تعذر تسجيل الدخول، حاول مرة أخرى');
+      }
       let user: CurrentUser;
-      if (systemUser?.role === 'admin' && systemUser.pass === password) {
+      if (adminResponse.ok && (await adminResponse.json()).authenticated === true) {
         user = { username: normalizedUsername, role: 'admin' };
       } else {
         const supervisor = await authenticateSupervisor(normalizedUsername, password);

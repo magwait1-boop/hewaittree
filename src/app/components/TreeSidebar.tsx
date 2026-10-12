@@ -28,7 +28,7 @@ const BRANCH_COLORS: Record<string, string> = {
 };
 
 export default function TreeSidebar({
-  nodeId, persons, personMap, childrenMap, currentUser,
+  nodeId, personMap, childrenMap, currentUser,
   onClose, onEdit, onAddChild, onDelete, onSelectDescendants, onCenterNode,
   compact = false, titleId,
 }: Props) {
@@ -94,7 +94,7 @@ export default function TreeSidebar({
               {person.branch &&
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                style={{ background: `${branchColor}22`, color: branchColor, border: `1px solid ${branchColor}44` }}>
+                style={{ background: `${branchColor}22`, color: `var(--branch-badge-text, ${branchColor})`, border: `1px solid ${branchColor}44` }}>
 
                   {person.branch}
                 </span>
@@ -188,7 +188,7 @@ export default function TreeSidebar({
               {permissions.can_edit && <button
               onClick={() => onAddChild(person.id)}
               className="btn-base flex-1 justify-center text-sm"
-              style={{ borderColor: '#3b82f6', color: '#93c5fd' }}>
+              style={{ borderColor: '#3b82f6', color: 'var(--text-blue)' }}>
 
                 + إضافة ابن
               </button>}

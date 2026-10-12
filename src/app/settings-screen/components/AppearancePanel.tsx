@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import type { AppSettings } from '@/lib/familyData';
+import ThemeToggle from '@/app/components/ThemeToggle';
 
 interface Props {
   settings: AppSettings;
@@ -8,9 +9,9 @@ interface Props {
 }
 
 const BG_OPTIONS = [
-  { id: 'bg-default', label: 'تدرج داكن', desc: 'خلفية متدرجة دائرية من لون الليل', preview: 'bg-default-canvas' },
-  { id: 'bg-grid', label: 'شبكة', desc: 'خلفية داكنة مع خطوط شبكية خفيفة', preview: 'bg-grid-canvas' },
-  { id: 'bg-dots', label: 'نقاط', desc: 'خلفية داكنة مع نقاط دائرية خفيفة', preview: 'bg-dots-canvas' },
+  { id: 'bg-default', label: 'تدرج', desc: 'خلفية متدرجة تتبع الوضع المختار', preview: 'bg-default-canvas' },
+  { id: 'bg-grid', label: 'شبكة', desc: 'خلفية مع خطوط شبكية خفيفة', preview: 'bg-grid-canvas' },
+  { id: 'bg-dots', label: 'نقاط', desc: 'خلفية مع نقاط دائرية خفيفة', preview: 'bg-dots-canvas' },
 ] as const;
 
 export default function AppearancePanel({ settings, onUpdate }: Props) {
@@ -21,10 +22,18 @@ export default function AppearancePanel({ settings, onUpdate }: Props) {
         <p className="text-sm text-muted-foreground">تحكم في خلفية اللوحة وحجم الخط الأساسي</p>
       </div>
 
+      <div className="settings-section flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <span className="settings-label">الوضع الفاتح والداكن</span>
+          <p className="text-xs text-muted-foreground">يُحفظ اختيارك تلقائياً على هذا الجهاز ويُطبق على جميع الصفحات.</p>
+        </div>
+        <ThemeToggle />
+      </div>
+
       {/* Background Style */}
       <div className="settings-section">
         <span className="settings-label">نمط الخلفية</span>
-        <div className="grid grid-cols-3 gap-3 mt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
           {BG_OPTIONS.map(opt => (
             <button
               key={`bg-${opt.id}`}
