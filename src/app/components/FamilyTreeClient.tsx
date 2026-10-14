@@ -3,6 +3,7 @@ import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect, 
 import dynamic from 'next/dynamic';
 import { flushSync } from 'react-dom';
 import { MOCK_PERSONS, DEFAULT_SETTINGS, LOCAL_SETTINGS_PENDING_KEY, buildChildrenMap, buildPersonMap, buildNameIndex, searchPersons, normalizeSettings, type Person, type PendingRequest, type AppSettings,  } from '@/lib/familyData';
+import type { NameSearchIndex } from '@/lib/arabicSearch';
 import { useFamilySession } from '@/contexts/FamilySessionContext';
 import { clampTreeZoom, getTreeBounds, getFitView, getMinimumZoom, zoomAtPoint } from '@/lib/treeViewport';
 export type { CurrentUser } from '@/lib/familyPermissions';
@@ -93,6 +94,7 @@ export default function FamilyTreeClient() {
   const { currentUser, permissions, signIn, signOut } = useFamilySession();
   const [sidebarNodeId, setSidebarNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchQueryRef = useRef('');
   const [searchMatches, setSearchMatches] = useState<string[]>([]);
   const [searchIndex, setSearchIndex] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -124,7 +126,13 @@ export default function FamilyTreeClient() {
   useEffect(() => {
     childrenMapRef.current = childrenMap;
   }, [childrenMap]);
-  const nameIndex = useMemo(() => buildNameIndex(persons), [persons]);
+  const previousNameIndex = useRef<NameSearchIndex | undefined>(undefined);
+  const nameIndex = useMemo(() => buildNameIndex(persons, previousNameIndex.current), [persons]);
+  useEffect(() => {
+    previousNameIndex.current = nameIndex;
+    setSearchMatches(searchPersons(searchQueryRef.current, [], nameIndex));
+    setSearchIndex(0);
+  }, [nameIndex]);
   const dragSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialFitDone = useRef(false);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -414,6 +422,7 @@ export default function FamilyTreeClient() {
   }, [personMap, setSafeView, getCanvasSize]);
 
   const handleSearch = useCallback((query: string) => {
+    searchQueryRef.current = query;
     setSearchQuery(query);
     closePersonDetails();
     if (!query.trim()) {

@@ -12,7 +12,9 @@ function loadTypeScript(relativePath, mocks = {}) {
   return module.exports;
 }
 
-const family = loadTypeScript('../src/lib/familyData.ts');
+const family = loadTypeScript('../src/lib/familyData.ts', {
+  './arabicSearch': loadTypeScript('../src/lib/arabicSearch.ts'),
+});
 const viewport = loadTypeScript('../src/lib/treeViewport.ts', { './familyData': family });
 const settings = { ...family.DEFAULT_SETTINGS };
 

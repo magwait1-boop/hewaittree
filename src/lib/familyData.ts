@@ -158,22 +158,7 @@ export function buildPersonMap(persons: Person[]): Map<string, Person> {
   return map;
 }
 
-export function buildNameIndex(persons: Person[]): Map<string, string[]> {
-  const index = new Map<string, string[]>();
-  for (const p of persons) {
-    const parts = p.name.split(' ');
-    for (const part of parts) {
-      const key = part.trim();
-      if (!key) continue;
-      if (!index.has(key)) index.set(key, []);
-      index.get(key)!.push(p.id);
-    }
-    // full name key
-    if (!index.has(p.name)) index.set(p.name, []);
-    if (!index.get(p.name)!.includes(p.id)) index.get(p.name)!.push(p.id);
-  }
-  return index;
-}
+export { buildNameIndex, searchPersons } from './arabicSearch';
 
 export function getGeneration(id: string, personMap: Map<string, Person>): number {
   let depth = 1;
@@ -212,32 +197,6 @@ export function getTotalDescendants(
   }
   memo.set(id, count);
   return count;
-}
-
-export function searchPersons(
-  query: string,
-  persons: Person[],
-  nameIndex: Map<string, string[]>
-): string[] {
-  if (!query.trim()) return [];
-  const q = query.trim();
-  // Try exact full name first
-  const exactIds = nameIndex.get(q) || [];
-  if (exactIds.length > 0) return exactIds;
-  // Partial match via index
-  const resultSet = new Set<string>();
-  for (const [key, ids] of nameIndex.entries()) {
-    if (key.includes(q) || q.includes(key)) {
-      ids.forEach(id => resultSet.add(id));
-    }
-  }
-  // Fallback linear scan for substring
-  if (resultSet.size === 0) {
-    for (const p of persons) {
-      if (p.name.includes(q)) resultSet.add(p.id);
-    }
-  }
-  return Array.from(resultSet);
 }
 
 export function getDescendantIds(
